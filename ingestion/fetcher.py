@@ -81,7 +81,8 @@ class DocumentFetcher:
         try:
             self.s3_client.head_bucket(Bucket=self.s3_bucket)
             logger.info(f"S3 bucket '{self.s3_bucket}' exists")
-        except:
+        except Exception as e:
+            # Bucket doesn't exist or access denied, try to create
             try:
                 self.s3_client.create_bucket(Bucket=self.s3_bucket)
                 logger.info(f"Created S3 bucket '{self.s3_bucket}'")
@@ -168,7 +169,7 @@ class DocumentFetcher:
             try:
                 self.s3_client.head_object(Bucket=self.s3_bucket, Key=storage_key)
                 logger.info(f"Document already exists in S3: {storage_key}")
-            except:
+            except Exception:
                 pass  # Doesn't exist, will upload
         
         # Upload to S3

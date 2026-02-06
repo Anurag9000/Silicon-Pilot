@@ -8,6 +8,7 @@ OCR fallback, and bounding box capture for evidence.
 import logging
 from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
+import tempfile
 import fitz  # PyMuPDF
 import pdfplumber
 import camelot
@@ -43,15 +44,17 @@ class PDFParser:
         """
         logger.info("Parsing PDF")
         
+        temp_file = None
         if isinstance(input_data, str):
             pdf_path = input_data
             pdf_bytes = Path(pdf_path).read_bytes()
         else:
             pdf_bytes = input_data
             # Save to temp file for Camelot (which requires a path)
-            temp_path = Path("/tmp/temp_datasheet.pdf")
-            temp_path.write_bytes(pdf_bytes)
-            pdf_path = str(temp_path)
+            temp_file = tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False)
+            temp_file.write(pdf_bytes)
+            temp_file.close()
+            pdf_path = temp_file.name
         
         result = {
             'pages': [],
@@ -67,9 +70,12 @@ class PDFParser:
             result['tables'] = self._extract_tables(pdf_path)
             
         finally:
-            # Cleanup if we created a temp file
-            if not isinstance(input_data, str) and Path(pdf_path).exists():
-                Path(pdf_path).unlink()
+            # Cleanup temp file if we created one
+            if temp_file is not None:
+                try:
+                    Path(temp_file.name).unlink()
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp file: {e}")
         
         return result
     
@@ -149,7 +155,7 @@ class PDFParser:
             # Normalize to 0-1 range (assume 500 chars per page is "normal")
             density = min(char_count / 500.0, 1.0)
             return density
-        except:
+        except Exception:
             return 0.0
     
     def _ocr_page(self, page) -> str:
