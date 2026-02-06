@@ -1,6 +1,6 @@
-# HardwareGenius: Ingestion & Extraction Tuning Guide
+# Silicon-Pilot: Ingestion & Extraction Tuning Guide
 
-In HardwareGenius, "training" refers to the process of tuning the ingestion pipeline to correctly identify, extract, and normalize specifications from manufacturer documents.
+In Silicon-Pilot, "training" refers to the process of tuning the ingestion pipeline to correctly identify, extract, and normalize specifications from manufacturer documents.
 
 ---
 

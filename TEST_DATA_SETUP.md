@@ -1,4 +1,4 @@
-# HardwareGenius: Test Data Setup Guide
+# Silicon-Pilot: Test Data Setup Guide
 
 This guide explains how to prepare and reset the environment for thorough system testing.
 

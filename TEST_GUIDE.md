@@ -1,6 +1,6 @@
-# HardwareGenius: Test Guide
+# Silicon-Pilot: Test Guide
 
-HardwareGenius includes a comprehensive test suite covering deterministic filtering, ranking explainability, and ingestion accuracy.
+Silicon-Pilot includes a comprehensive test suite covering deterministic filtering, ranking explainability, and ingestion accuracy.
 
 ---
 

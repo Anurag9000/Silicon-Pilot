@@ -153,7 +153,7 @@ async def test_solver_components():
 async def main():
     """Main test runner"""
     logger.info("="*60)
-    logger.info("HardwareGenius Quick Test")
+    logger.info("Silicon-Pilot Quick Test")
     logger.info("="*60)
     
     try:
