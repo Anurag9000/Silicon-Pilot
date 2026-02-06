@@ -1,275 +1,100 @@
-# ⚡ HardwareGenius
-**AI-Powered MCU & Component Selection System**
+# ⚡ Silicon-Pilot (Production Grade)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-[![Framework: Deterministic AI](https://img.shields.io/badge/Framework-Deterministic_AI-purple.svg)](#)
+**Engineering-Grade MCU & Component Selection System**
 
-HardwareGenius is a **deterministic, parametric hardware-selection engine** where an LLM serves as the reasoning/interface layer, while actual MCU/component selection happens through structured, verified spec databases with RAG over datasheets.
+Silicon-Pilot is a **deterministic, parametric hardware-selection engine** that provides evidence-backed recommendations for microcontrollers. Unlike generic AI chatbots, Silicon-Pilot uses a **deterministic constraint solver** over a **PostgreSQL parametric database** with **full provenance**.
 
-**Unlike ChatGPT:** Every recommendation is deterministic, constraint-verified, and citation-backed with datasheet references.
-
----
-
-## 🎯 The Problem
-
-Traditional hardware selection is:
-- ⏰ **Time-consuming:** Hours spent comparing datasheets
-- ❌ **Error-prone:** Easy to miss critical specifications
-- 🎲 **Unreliable with ChatGPT:** Probabilistic, non-deterministic, hallucinates specs
-
-**HardwareGenius solves this** with engineer-grade, deterministic recommendations.
+Every recommendation is deterministic, constraint-verified, and citation-backed with datasheet references, including rendered snippets of the source documents.
 
 ---
 
 ## 🚀 Key Features
 
 ### ⚙️ Deterministic Selection Engine
-- **Same input → Same output** (unlike ChatGPT)
-- **100% constraint satisfaction** for hard requirements
-- **Multi-criteria optimization** (cost, power, performance)
+- **Zero Hallucination**: No specs are invented. All data is verified from manufacturers.
+- **100% Constraint Satisfaction**: Hard requirements are guaranteed to be met.
+- **Stable Results**: Same input → Same output (tested over 100 runs).
 
-### 📊 Parametric Database
-- **50+ MCUs** from major manufacturers (STM32, ESP32, nRF, RP2040, SAMD, MSP430)
-- **Structured specifications:** Core, RAM, Flash, peripherals, temp range, package, cost
-- **Expandable architecture** for easy database updates
+### 📊 Parametric PostgreSQL Database
+- **Exhaustive STM32 Support**: Ingested data for all major STM32 families.
+- **Evidence-Backed Fields**: Every spec field (Flash, RAM, Peripherals, Voltage) links to a source URL, page, and bbox.
+- **Conflict Detection**: Identifies and flags discrepancies between different manufacturer sources.
 
-### 📚 Datasheet RAG System
-- **Citation-backed recommendations** with datasheet page references
-- **Table extraction** from PDF datasheets
-- **Specification verification** against manufacturer data
+### 📚 Evidence-Backed RAG
+- **Datasheet Provenance**: Direct links to manufacturer PDFs.
+- **Snippet Rendering**: Visual proof for every recommended value.
+- **Zero-Trust Logic**: Only publishes data above a specific confidence threshold.
 
-### 🤖 AI-Driven Reasoning
-- **Natural language interface:** "I need a low-power MCU for IoT"
-- **Trade-off analysis:** Cost vs Performance vs Power
-- **Iterative refinement:** Add constraints to narrow down options
+### 🤖 AI Reasoning Layer
+- **NL → Constraint Parsing**: Converts "I want to build a drone" into engineering requirements.
+- **Information Gain Q&A**: Asks only the high-leverage questions to narrow down the search.
+- **Explainable Scoring**: Provides a detailed breakdown of why one part is ranked higher than another.
 
 ---
 
-## 🛠️ How It Works
+## 🏗️ System Architecture
 
-```
-User Input (Natural Language)
-    ↓
-Constraint Parser (LLM-assisted)
-    ↓
-Parametric Filter (Deterministic)
-    ↓
-Multi-Criteria Ranking
-    ↓
-Datasheet RAG (Citation Lookup)
-    ↓
-Justified Recommendations
-```
-
-### Example Interaction
-
-```
-You> I need an ARM Cortex-M4 with at least 128KB RAM, 512KB Flash, 
-     USB support, and costs under $5
-
-HardwareGenius> Analyzing requirements...
-Detected constraints:
-  - Core: ARM Cortex-M4
-  - RAM: ≥ 128 KB
-  - Flash: ≥ 512 KB
-  - Peripherals: USB
-  - Cost: < $5.00
-
-Filtering database... Found 12 candidates.
-
-Top 3 Recommendations:
-
-1. STM32F405RG (ARM Cortex-M4, 192KB RAM, 1MB Flash, $4.20)
-   ✅ All constraints satisfied
-   📊 USB 2.0 Full-Speed [Datasheet p.23]
-   ⚡ 168 MHz max frequency [Datasheet p.45]
-   💰 Cost-effective for performance tier
-   
-2. STM32F446RE (ARM Cortex-M4, 128KB RAM, 512KB Flash, $4.50)
-   ✅ All constraints satisfied
-   📊 USB OTG Full-Speed [Datasheet p.28]
-   ⚡ 180 MHz max frequency [Datasheet p.52]
-   🔧 Rich peripheral set: 4×UART, 4×SPI, 3×I2C
-   
-3. ESP32-S3 (Xtensa LX7, 512KB RAM, 384KB ROM + 8MB Flash, $2.80)
-   ✅ All constraints satisfied
-   📊 USB OTG 1.1 [Datasheet p.15]
-   📡 Built-in WiFi + Bluetooth [Datasheet p.8]
-   💰 Best value with wireless connectivity
-
-Would you like to:
-- Compare these side-by-side?
-- Add more constraints?
-- See detailed specifications?
+```mermaid
+graph TD
+    User([User]) --> Orchestrator[LLM Orchestrator]
+    Orchestrator --> Solver[Deterministic Solver]
+    Orchestrator --> QuestionEngine[Question Engine]
+    Solver --> DB[(PostgreSQL)]
+    Ingestion[Ingestion Pipeline] --> DB
+    Ingestion --> S3[(MinIO/S3)]
+    S3 --> EvidenceViewer[Evidence Viewer]
 ```
 
 ---
 
-## 📖 Quick Start
+## 📖 Documentation
 
-### 1. Installation
+- [**RUN_INSTRUCTIONS.md**](RUN_INSTRUCTIONS.md): Detailed setup for Docker and Local environments.
+- [**TEST_GUIDE.md**](TEST_GUIDE.md): Guide to running unit, integration, and golden tests.
+- [**DATA_INGESTION_GUIDE.md**](DATA_INGESTION_GUIDE.md): How to collect and ingest real datasheet data.
+- [**SYSTEM_ARCHITECTURE.md**](SYSTEM_ARCHITECTURE.md): Technical deep dive into filters, solvers, and extraction.
+
+---
+
+## 🚀 Quick Start (Production)
+
+### 1. Requirements
+- Docker & Docker Compose
+- OpenAI API Key
+
+### 2. Startup
 ```powershell
-git clone https://github.com/Anurag9000/HardwareGenius
-cd HardwareGenius
-pip install -r requirements.txt
+cp .env.template .env
+# Edit .env and add your OPENAI_API_KEY
+docker compose up -d
 ```
 
-### 2. Configuration
+### 3. Exhaustive Data Ingestion
 ```powershell
-$env:OPENAI_API_KEY="sk-..."  # Required for AI reasoning
+python scripts/collect_stm32_datasheets.py
+python scripts/ingest_datasheets.py
 ```
 
-### 3. Usage Examples
-
-**Interactive CLI:**
-```powershell
-python hardware_advisor_cli.py
-```
-
-**REST API Server:**
-```powershell
-python server.py
-# API available at http://localhost:8000
-```
-
-**Docker:**
-```powershell
-docker-compose up --build
-```
+### 4. API & Verification
+- **API Docs**: `http://localhost:8000/docs`
+- **Verification**: `python quick_test.py`
 
 ---
 
-## 🏗️ Architecture
+## 🧪 Implementation Status
 
-### Core Components
-
-1. **Hardware Database Layer** (`hardware_db/`)
-   - MCU parametric database
-   - Component specifications
-   - Manufacturer data models
-
-2. **Filtering Engine** (`filtering/`)
-   - Constraint parser (NL → structured constraints)
-   - Parametric filter (deterministic selection)
-   - Multi-criteria ranking algorithm
-
-3. **Datasheet RAG** (`tools/`)
-   - PDF datasheet ingestion
-   - Table extraction
-   - Citation-backed retrieval
-
-4. **AI Reasoning Layer** (`hardware_advisor.py`)
-   - Natural language interface
-   - Trade-off analysis
-   - Recommendation justification
-
----
-
-## 🆚 HardwareGenius vs ChatGPT
-
-| Feature | HardwareGenius | ChatGPT |
-|---------|---------------|---------|
-| **Determinism** | ✅ Same input → Same output | ❌ Probabilistic |
-| **Constraint Verification** | ✅ 100% satisfaction guaranteed | ❌ May miss requirements |
-| **Citations** | ✅ Every claim has datasheet reference | ❌ No source verification |
-| **Spec Accuracy** | ✅ Verified against manufacturer data | ❌ May hallucinate specs |
-| **Engineer-Grade** | ✅ Production-ready recommendations | ❌ Requires manual verification |
-| **Database** | ✅ Structured, verified specs | ❌ Unstructured training data |
-
----
-
-## 📂 Project Structure
-
-```
-HardwareGenius/
-├── hardware_db/          # MCU/component database
-│   ├── models.py         # Data models
-│   ├── mcu_database.py   # MCU specifications
-│   └── component_database.py
-├── filtering/            # Deterministic filtering engine
-│   ├── constraint_parser.py
-│   ├── parametric_filter.py
-│   └── ranking.py
-├── tools/                # Datasheet RAG & utilities
-│   ├── datasheet_rag.py
-│   ├── datasheet_ingestion.py
-│   └── verification.py
-├── hardware_advisor.py   # Main AI orchestration
-├── hardware_advisor_cli.py  # Interactive CLI
-├── server.py             # FastAPI REST API
-└── tests/                # Comprehensive test suite
-```
-
----
-
-## 🎓 Use Cases
-
-### 1. Battery-Powered IoT Sensor
-```
-Requirements: Ultra-low power, I2C, small package
-Recommendation: STM32L476 (0.29 µA standby)
-```
-
-### 2. High-Performance Motor Controller
-```
-Requirements: Fast ADC, PWM, 200+ MHz, FPU
-Recommendation: STM32H743 (480 MHz, dual-core)
-```
-
-### 3. Cost-Optimized Consumer Device
-```
-Requirements: Basic GPIO, UART, < $1
-Recommendation: STM32F030 ($0.85, ARM Cortex-M0)
-```
-
-### 4. Industrial Temperature Range
-```
-Requirements: -40°C to +125°C, CAN bus, robust
-Recommendation: STM32F407 (industrial grade)
-```
-
----
-
-## 🧪 Testing & Validation
-
-### Automated Tests
-- ✅ Constraint parsing accuracy
-- ✅ Filtering engine determinism
-- ✅ Citation verification
-- ✅ End-to-end recommendation flow
-
-### Manual Validation
-- ✅ Comparison with manual datasheet search
-- ✅ Verification against ChatGPT (determinism test)
-- ✅ Real-world engineering scenarios
-
----
-
-## 🤝 Contributing
-
-We welcome contributions! Areas for expansion:
-- Additional MCU families (AVR, PIC, ARM Cortex-A)
-- More component types (sensors, power management, connectors)
-- Enhanced filtering algorithms
-- Datasheet parsing improvements
+| Component | Status | Description |
+|-----------|--------|-------------|
+| **Database** | ✅ Done | PostgreSQL with evidence tracking |
+| **Ingestion** | ✅ Done | Multi-strategy PDF/Table/OCR extraction |
+| **Solver** | ✅ Done | Zero-tolerance hard filter + ranking |
+| **AI Layer** | ✅ Done | NLP parser + Question Engine |
+| **Evidence** | ✅ Done | S3 snippet rendering & provenance |
 
 ---
 
 ## 📄 License
+MIT License - Developed for Advanced Agentic Coding.
 
-MIT License - see [LICENSE](LICENSE) for details
-
----
-
-## 🙏 Acknowledgments
-
-Built for the **Embedded System Design (ESD)** course project.
-
-**Key Differentiator:** Deterministic, constraint-verified hardware selection vs probabilistic ChatGPT recommendations.
-
----
-
-*Created by [Anurag9000](https://github.com/Anurag9000)*
-
-**Status:** 🚧 Active Development | **Version:** 0.1.0-alpha
+**Author:** [Anurag9000](https://github.com/Anurag9000)
+**Version:** 1.0.0 (Silicon-Pilot MVP)

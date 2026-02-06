@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
     global db_ops, hard_filter, ranking_engine, near_miss_engine, llm_orchestrator, question_engine
     
     # Startup
-    logger.info("Starting HardwareGenius API")
+    logger.info("Starting Silicon-Pilot API")
     
     # Connect to database
     await db.connect()

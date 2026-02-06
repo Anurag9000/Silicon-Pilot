@@ -85,6 +85,26 @@ class FieldExtractor:
                 {'pattern': r'(\d+)[-\s]?pin', 'unit_multiplier': None},
                 {'pattern': r'(?:LQFP|QFN|BGA|TQFP)[-\s]?(\d+)', 'unit_multiplier': None},
             ],
+            'vdd_min_v': [
+                {'pattern': r'(\d+\.?\d*)\s*V\s+to\s+\d+\.?\d*\s*V', 'unit_multiplier': None},
+                {'pattern': r'Voltage.*?(\d+\.?\d*)\s*V', 'unit_multiplier': None},
+            ],
+            'vdd_max_v': [
+                {'pattern': r'\d+\.?\d*\s*V\s+to\s+(\d+\.?\d*)\s*V', 'unit_multiplier': None},
+                {'pattern': r'Voltage.*?to\s+(\d+\.?\d*)\s*V', 'unit_multiplier': None},
+            ],
+            'power_run_ua_mhz': [
+                {'pattern': r'(\d+\.?\d*)\s*µA/MHz', 'unit_multiplier': None},
+                {'pattern': r'Run\s+mode.*?(\d+\.?\d*)\s*µA/MHz', 'unit_multiplier': None},
+            ],
+            'power_stop_ua': [
+                {'pattern': r'(\d+\.?\d*)\s*µA\s+in\s+Stop', 'unit_multiplier': None},
+                {'pattern': r'Stop\s+mode.*?(\d+\.?\d*)\s*µA', 'unit_multiplier': None},
+            ],
+            'power_standby_na': [
+                {'pattern': r'(\d+\.?\d*)\s*nA\s+in\s+Standby', 'unit_multiplier': None},
+                {'pattern': r'Standby\s+mode.*?(\d+\.?\d*)\s*nA', 'unit_multiplier': None},
+            ],
         }
     
     def extract_mpns(

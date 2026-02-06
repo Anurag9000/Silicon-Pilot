@@ -6,7 +6,7 @@ OCR fallback, and bounding box capture for evidence.
 """
 
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 from pathlib import Path
 import fitz  # PyMuPDF
 import pdfplumber
@@ -31,20 +31,27 @@ class PDFParser:
         if tesseract_cmd:
             pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
     
-    def parse(self, pdf_bytes: bytes) -> Dict:
+    def parse(self, input_data: Any) -> Dict:
         """
         Parse PDF with all available strategies.
         
         Args:
-            pdf_bytes: PDF file content
+            input_data: PDF file content (bytes) or path to PDF (str)
         
         Returns:
-            Dict with:
-                - pages: List of page data
-                - tables: Extracted tables with page numbers
-                - metadata: PDF metadata
+            Dict with pages, tables, and metadata
         """
         logger.info("Parsing PDF")
+        
+        if isinstance(input_data, str):
+            pdf_path = input_data
+            pdf_bytes = Path(pdf_path).read_bytes()
+        else:
+            pdf_bytes = input_data
+            # Save to temp file for Camelot (which requires a path)
+            temp_path = Path("/tmp/temp_datasheet.pdf")
+            temp_path.write_bytes(pdf_bytes)
+            pdf_path = str(temp_path)
         
         result = {
             'pages': [],
@@ -52,21 +59,17 @@ class PDFParser:
             'metadata': {},
         }
         
-        # Save to temp file for processing
-        temp_path = Path("/tmp/temp_datasheet.pdf")
-        temp_path.write_bytes(pdf_bytes)
-        
         try:
             # Extract metadata and pages
             result['metadata'], result['pages'] = self._extract_pages(pdf_bytes)
             
             # Extract tables
-            result['tables'] = self._extract_tables(str(temp_path))
+            result['tables'] = self._extract_tables(pdf_path)
             
         finally:
-            # Cleanup
-            if temp_path.exists():
-                temp_path.unlink()
+            # Cleanup if we created a temp file
+            if not isinstance(input_data, str) and Path(pdf_path).exists():
+                Path(pdf_path).unlink()
         
         return result
     

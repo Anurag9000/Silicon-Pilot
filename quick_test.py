@@ -37,7 +37,10 @@ async def test_ingestion_components():
     parser = PDFParser()
     parsed_data = parser.parse(str(test_pdf))
     
-    logger.info(f"  - Extracted {len(parsed_data['text'])} characters of text")
+    # Combine text from all pages
+    full_text = "\n".join([page['text'] for page in parsed_data['pages']])
+    
+    logger.info(f"  - Extracted {len(full_text)} characters of text")
     logger.info(f"  - Found {len(parsed_data['tables'])} tables")
     logger.info(f"  - Processed {len(parsed_data['pages'])} pages")
     
@@ -45,7 +48,7 @@ async def test_ingestion_components():
     logger.info("Step 2: Extracting fields...")
     extractor = FieldExtractor()
     extractions = extractor.extract_all_fields(
-        parsed_data['text'],
+        full_text,
         parsed_data['tables'],
     )
     
