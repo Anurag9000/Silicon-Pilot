@@ -420,9 +420,6 @@ class RecommendRequest(BaseModel):
 # VALIDATION HELPERS
 # ============================================================================
 
-@validator('confidence')
-def validate_confidence(cls, v):
-    """Ensure confidence is between 0 and 1"""
-    if not 0.0 <= v <= 1.0:
-        raise ValueError('Confidence must be between 0.0 and 1.0')
-    return v
+# Note: Field validators are already defined inline using Pydantic's Field() constraints
+# (e.g., Field(ge=0.0, le=1.0) for confidence fields)
+

@@ -221,7 +221,7 @@ class DatabaseOperations:
                 spec_id,
                 spec.model_dump_json(),
                 source_text,
-                spec.mode.value if spec.mode else 'constraint',
+                spec.mode if isinstance(spec.mode, str) else 'constraint',
             )
         
         return spec_id
