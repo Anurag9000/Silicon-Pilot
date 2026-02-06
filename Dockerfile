@@ -1,29 +1,37 @@
-# Use an official Python runtime as a parent image
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# Set the working directory in the container
-WORKDIR /app
-
-# Install system dependencies for document processing
+# Install system dependencies for PDF processing and OCR
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libmagic-dev \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    libpq-dev \
+    gcc \
+    g++ \
+    ghostscript \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the requirements file into the container
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
+# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy application code
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads rag_storage
+RUN mkdir -p /app/logs /app/temp
 
-# Expose the API port
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+# Expose port
 EXPOSE 8000
 
-# Command to run the FastAPI server
-CMD ["python", "server.py"]
+# Default command (can be overridden in docker-compose)
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
