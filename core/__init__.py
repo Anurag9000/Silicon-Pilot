@@ -49,6 +49,10 @@ from .models import (
     RecommendRequest,
 )
 
+# Database utilities
+from .database import Database, db
+from .db_operations import DatabaseOperations
+
 __all__ = [
     # Enums
     "SourceType",
@@ -96,4 +100,9 @@ __all__ = [
     "AnswerQuestionsRequest",
     "AnswerQuestionsResponse",
     "RecommendRequest",
+    
+    # Database
+    "Database",
+    "db",
+    "DatabaseOperations",
 ]
