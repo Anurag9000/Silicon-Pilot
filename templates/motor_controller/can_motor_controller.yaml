@@ -1,0 +1,314 @@
+# CAN Motor Controller Template
+# High-performance motor controller with CAN communication
+
+id: can_motor_controller_v1
+version: "1.0"
+device_type: motor_controller
+name: "CAN Motor Controller"
+description: "Closed-loop motor controller with CAN communication for automotive and industrial applications"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - motor_control
+      - can_comm
+      - adc_sampling
+      - pid_control
+    baseline_constraints:
+      core_arch: ["cortex-m4", "cortex-m7"]
+      min_mhz: 120
+      min_flash_kb: 256
+      min_sram_kb: 64
+      peripherals:
+        pwm_timers: 6
+        adc_channels: 3
+        can: 1
+        uart: 1
+        spi: 1
+      has_fpu: true
+      has_dsp: true
+    notes: "MCU must support motor control peripherals and real-time performance"
+  
+  power:
+    required_functions:
+      - buck_conversion
+      - linear_regulation
+      - power_monitoring
+    baseline_constraints:
+      input_voltage_range: [12, 48]
+      output_voltage: 3.3
+      output_current_ma: 500
+      efficiency_min: 0.85
+    notes: "Power supply for MCU and gate drivers"
+  
+  communication:
+    required_functions:
+      - wired_interface
+    baseline_constraints:
+      can_bitrate: 500000
+      can_fd_capable: false
+    notes: "CAN transceiver for vehicle/industrial network"
+  
+  actuation:
+    required_functions:
+      - motor_control
+    baseline_constraints:
+      gate_driver_channels: 6
+      max_current_a: 30
+    notes: "Gate drivers for motor phases"
+  
+  sensing:
+    required_functions:
+      - data_acquisition
+    baseline_constraints:
+      current_sense_channels: 3
+      voltage_sense_channels: 1
+      position_encoder: true
+    notes: "Current, voltage, and position sensing"
+  
+  protection:
+    required_functions:
+      - load_switching
+    baseline_constraints:
+      overcurrent_protection: true
+      overvoltage_protection: true
+      thermal_shutdown: true
+    optional: false
+    notes: "Essential protection circuits"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - can
+  - spi
+  - uart
+  - adc
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: motor_type
+    text: "What motor type will you control?"
+    type: choice
+    choices: ["BLDC", "DC", "Stepper", "PMSM"]
+    priority: high
+    help_text: "BLDC and PMSM require 3-phase control, DC requires H-bridge, Stepper requires step/direction"
+  
+  - id: supply_voltage
+    text: "Input voltage range (V)?"
+    type: range
+    priority: high
+    help_text: "Typical automotive: 12V, Industrial: 24V or 48V"
+  
+  - id: peak_current
+    text: "Peak phase current (A)?"
+    type: number
+    priority: high
+    help_text: "Maximum current per motor phase"
+  
+  - id: control_mode
+    text: "Control mode?"
+    type: choice
+    choices: ["Open Loop", "Closed Loop (Encoder)", "Closed Loop (Sensorless)"]
+    priority: high
+    help_text: "Closed loop requires position feedback"
+  
+  - id: can_fd_required
+    text: "CAN-FD required?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "CAN-FD provides higher bandwidth but requires compatible network"
+  
+  - id: isolation_required
+    text: "Galvanic isolation required?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "Required for high-voltage or safety-critical applications"
+  
+  - id: temperature_grade
+    text: "Operating temperature range?"
+    type: choice
+    choices: ["Industrial (-40 to 85°C)", "Automotive (-40 to 125°C)", "Extended (-40 to 105°C)"]
+    default: "Industrial (-40 to 85°C)"
+    priority: medium
+  
+  - id: pwm_frequency
+    text: "PWM frequency (kHz)?"
+    type: number
+    default: 20
+    priority: low
+    help_text: "Typical range: 10-50 kHz"
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # BLDC/PMSM specific requirements
+  - condition: "motor_type in ['BLDC', 'PMSM']"
+    description: "BLDC/PMSM motors require 3-phase control with advanced PWM"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_flash_kb
+        operation: add
+        value: 128
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.pwm_timers
+        operation: set
+        value: 6
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.adc_channels
+        operation: set
+        value: 3
+  
+  # Stepper motor requirements
+  - condition: "motor_type == 'Stepper'"
+    description: "Stepper motors require step/direction control"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.pwm_timers
+        operation: set
+        value: 4
+      - type: update_constraint
+        subsystem: actuation
+        field: gate_driver_channels
+        operation: set
+        value: 4
+  
+  # High current requirements
+  - condition: "peak_current > 20"
+    description: "High current requires isolation and enhanced protection"
+    actions:
+      - type: update_constraint
+        subsystem: protection
+        field: isolation_required
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: sensing
+        field: current_sense_amplifier_gain
+        operation: set
+        value: 20
+  
+  # Closed-loop encoder control
+  - condition: "control_mode == 'Closed Loop (Encoder)'"
+    description: "Encoder feedback requires quadrature input"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.encoder_inputs
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: sensing
+        field: encoder_resolution_min
+        operation: set
+        value: 1024
+  
+  # Sensorless control
+  - condition: "control_mode == 'Closed Loop (Sensorless)'"
+    description: "Sensorless control requires higher processing power"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 180
+      - type: update_constraint
+        subsystem: compute
+        field: min_flash_kb
+        operation: add
+        value: 64
+  
+  # CAN-FD requirement
+  - condition: "can_fd_required == True"
+    description: "CAN-FD requires compatible MCU and transceiver"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.can_fd
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: communication
+        field: can_fd_capable
+        operation: set
+        value: true
+  
+  # Isolation requirement
+  - condition: "isolation_required == True"
+    description: "Isolation requires isolated gate drivers and power supply"
+    actions:
+      - type: update_constraint
+        subsystem: actuation
+        field: isolated_gate_drivers
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: power
+        field: isolated_power_supply
+        operation: set
+        value: true
+  
+  # Automotive temperature grade
+  - condition: "temperature_grade == 'Automotive (-40 to 125°C)'"
+    description: "Automotive grade components required"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: temp_min_c
+        operation: set
+        value: -40
+      - type: update_constraint
+        subsystem: compute
+        field: temp_max_c
+        operation: set
+        value: 125
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - motor_control
+  - can
+  - automotive
+  - industrial
+  - bldc
+  - pmsm
+  - real_time
+
+author: "HardwareGenius Team"
+created_at: "2026-02-06"
+updated_at: "2026-02-06"
+
+use_cases:
+  - "Electric vehicle motor control"
+  - "Industrial servo drives"
+  - "Robotics actuator control"
+  - "HVAC fan control"
+  - "Pump and compressor control"
+
+example_products:
+  - "ODrive motor controller"
+  - "VESC (Vedder ESC)"
+  - "Trinamic motion control boards"
+
+references:
+  - "https://www.ti.com/motor-drivers/overview.html"
+  - "https://www.st.com/en/motor-drivers.html"
+  - "Application Note: Field-Oriented Control of PMSM Motors"

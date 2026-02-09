@@ -1,0 +1,349 @@
+# Environmental Data Logger Template
+# Standalone data logger with SD card storage and USB interface
+
+id: environmental_data_logger_v1
+version: "1.0"
+device_type: data_logger
+name: "Environmental Data Logger"
+description: "Standalone data logger for environmental monitoring with SD card storage and USB interface"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - data_acquisition
+      - state_machine
+    baseline_constraints:
+      core_arch: ["cortex-m0+", "cortex-m3", "cortex-m4"]
+      min_mhz: 48
+      min_flash_kb: 128
+      min_sram_kb: 16
+      peripherals:
+        i2c: 1
+        spi: 1
+        uart: 1
+        adc_channels: 4
+        sdmmc: 1
+        usb_fs: 1
+        rtc: 1
+      has_rtc: true
+    notes: "MCU with SD card and USB support for data logging"
+  
+  power:
+    required_functions:
+      - linear_regulation
+      - battery_management
+    baseline_constraints:
+      input_voltage_range: [3.7, 5.5]
+      output_voltage: 3.3
+      output_current_ma: 200
+      battery_backup: true
+    notes: "Power supply with battery backup for RTC"
+  
+  storage:
+    required_functions:
+      - data_storage
+    baseline_constraints:
+      storage_type: "sd_card"
+      capacity_gb_min: 4
+      interface: "sdmmc"
+    notes: "SD card for data storage"
+  
+  sensing:
+    required_functions:
+      - data_acquisition
+    baseline_constraints:
+      sensor_interface: "i2c"
+      sensor_types: []
+      analog_inputs: 4
+    notes: "I2C sensors and analog inputs"
+  
+  user_interface:
+    required_functions:
+      - local_display
+    baseline_constraints:
+      display_type: "lcd"
+      buttons: 3
+    optional: true
+    notes: "Optional LCD display and buttons"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - i2c
+  - spi
+  - sdmmc
+  - usb_fs
+  - uart
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: power_source
+    text: "Primary power source?"
+    type: choice
+    choices: ["USB (5V)", "Battery (Li-ion)", "Wall Adapter (9-12V)", "Dual (USB + Battery)"]
+    priority: high
+    help_text: "Determines power supply design"
+  
+  - id: sensor_types
+    text: "Sensor types? (select all that apply)"
+    type: choice
+    choices: ["Temperature", "Humidity", "Pressure", "CO2", "Light", "Analog (0-5V)", "Analog (4-20mA)"]
+    priority: high
+    help_text: "Determines sensor interfaces and signal conditioning"
+  
+  - id: sampling_rate
+    text: "Sampling rate?"
+    type: choice
+    choices: ["1 sample/minute", "1 sample/second", "10 samples/second", "100 samples/second", "1000 samples/second"]
+    priority: high
+    help_text: "Determines processing requirements and storage capacity"
+  
+  - id: storage_capacity
+    text: "Minimum storage capacity (GB)?"
+    type: number
+    default: 4
+    priority: medium
+    help_text: "SD card capacity requirement"
+  
+  - id: display_required
+    text: "LCD display required?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "For local data viewing without computer"
+  
+  - id: wireless_upload
+    text: "Wireless data upload?"
+    type: choice
+    choices: ["None", "WiFi", "Bluetooth", "Cellular"]
+    default: "None"
+    priority: medium
+    help_text: "For remote data access"
+  
+  - id: timestamp_accuracy
+    text: "Timestamp accuracy requirement?"
+    type: choice
+    choices: ["Standard RTC (±5 ppm)", "High-precision RTC (±1 ppm)", "GPS-synchronized"]
+    default: "Standard RTC (±5 ppm)"
+    priority: medium
+  
+  - id: industrial_io
+    text: "Industrial I/O (4-20mA) required?"
+    type: boolean
+    default: false
+    priority: low
+    help_text: "Requires signal conditioning circuits"
+  
+  - id: enclosure_type
+    text: "Enclosure type?"
+    type: choice
+    choices: ["Desktop", "DIN Rail", "Outdoor (IP65)", "Portable"]
+    default: "Desktop"
+    priority: low
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # High sampling rate requirements
+  - condition: "sampling_rate in ['100 samples/second', '1000 samples/second']"
+    description: "High-speed sampling requires faster MCU and DMA"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 120
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.dma_channels
+        operation: set
+        value: 2
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: set
+        value: 32
+  
+  # Storage capacity
+  - condition: "storage_capacity > 16"
+    description: "Large storage requires SDHC/SDXC support"
+    actions:
+      - type: update_constraint
+        subsystem: storage
+        field: capacity_gb_min
+        operation: set
+        value: 32
+      - type: update_constraint
+        subsystem: storage
+        field: card_type
+        operation: set
+        value: "sdhc"
+  
+  # Display requirements
+  - condition: "display_required == True"
+    description: "Display requires SPI interface and additional memory"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.spi
+        operation: set
+        value: 2
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 8
+      - type: update_constraint
+        subsystem: user_interface
+        field: optional
+        operation: set
+        value: false
+  
+  # Wireless upload
+  - condition: "wireless_upload == 'WiFi'"
+    description: "WiFi requires ESP32 or WiFi module"
+    actions:
+      - type: add_subsystem
+        subsystem: communication
+        value:
+          required_functions: ["wireless_uplink"]
+          baseline_constraints:
+            wireless_protocol: "wifi"
+            interface: "uart"
+      - type: update_constraint
+        subsystem: power
+        field: output_current_ma
+        operation: set
+        value: 500
+  
+  - condition: "wireless_upload == 'Bluetooth'"
+    description: "Bluetooth for smartphone connectivity"
+    actions:
+      - type: add_subsystem
+        subsystem: communication
+        value:
+          required_functions: ["short_range_comm"]
+          baseline_constraints:
+            wireless_protocol: "ble"
+            interface: "uart"
+  
+  - condition: "wireless_upload == 'Cellular'"
+    description: "Cellular requires modem module"
+    actions:
+      - type: add_subsystem
+        subsystem: communication
+        value:
+          required_functions: ["long_range_comm"]
+          baseline_constraints:
+            wireless_protocol: "cellular"
+            interface: "uart"
+      - type: update_constraint
+        subsystem: power
+        field: output_current_ma
+        operation: set
+        value: 2000
+  
+  # GPS timestamp
+  - condition: "timestamp_accuracy == 'GPS-synchronized'"
+    description: "GPS requires UART interface"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: set
+        value: 2
+      - type: add_subsystem
+        subsystem: sensing
+        value:
+          required_functions: ["gps_timing"]
+          baseline_constraints:
+            gps_module: true
+  
+  # Industrial I/O
+  - condition: "industrial_io == True"
+    description: "4-20mA requires signal conditioning"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: current_loop_inputs
+        operation: set
+        value: 4
+      - type: update_constraint
+        subsystem: sensing
+        field: signal_conditioning
+        operation: set
+        value: true
+  
+  # Analog sensors
+  - condition: "'Analog (4-20mA)' in sensor_types"
+    description: "4-20mA sensors require current-to-voltage conversion"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: current_loop_inputs
+        operation: set
+        value: 4
+      - type: update_constraint
+        subsystem: sensing
+        field: precision_resistors
+        operation: set
+        value: true
+  
+  # Battery backup
+  - condition: "power_source in ['Battery (Li-ion)', 'Dual (USB + Battery)']"
+    description: "Battery requires charging circuit"
+    actions:
+      - type: update_constraint
+        subsystem: power
+        field: battery_charger
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: power
+        field: battery_monitoring
+        operation: set
+        value: true
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - data_logger
+  - environmental
+  - sd_card
+  - usb
+  - standalone
+  - monitoring
+
+author: "HardwareGenius Team"
+created_at: "2026-02-06"
+updated_at: "2026-02-06"
+
+use_cases:
+  - "Environmental monitoring stations"
+  - "Industrial process monitoring"
+  - "Laboratory data acquisition"
+  - "Agricultural monitoring"
+  - "HVAC system monitoring"
+
+example_products:
+  - "Onset HOBO data loggers"
+  - "Lascar EL-USB series"
+  - "Adafruit Adalogger"
+
+references:
+  - "https://www.onsetcomp.com/products/data-loggers"
+  - "Application Note: SD Card Interface Design"
+  - "Application Note: Low-Power Data Logging"

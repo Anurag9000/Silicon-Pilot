@@ -1,0 +1,304 @@
+# IoT Sensor Node Template
+# Battery-powered wireless sensor node for environmental monitoring
+
+id: iot_sensor_node_v1
+version: "1.0"
+device_type: sensor_node
+name: "IoT Sensor Node"
+description: "Ultra-low-power wireless sensor node for environmental monitoring with LoRa/BLE connectivity"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - data_acquisition
+      - protocol_handling
+      - state_machine
+    baseline_constraints:
+      core_arch: ["cortex-m0+", "cortex-m4"]
+      min_mhz: 32
+      min_flash_kb: 64
+      min_sram_kb: 8
+      peripherals:
+        i2c: 1
+        spi: 1
+        uart: 1
+        adc_channels: 2
+        rtc: 1
+      power_profile: ultra_low_power
+      deep_sleep_ua_max: 1
+      active_ma_max: 10
+    notes: "Ultra-low-power MCU with deep sleep modes"
+  
+  power:
+    required_functions:
+      - linear_regulation
+      - battery_management
+      - power_monitoring
+    baseline_constraints:
+      input_voltage_range: [1.8, 3.6]
+      output_voltage: 3.3
+      quiescent_current_ua_max: 1
+      battery_monitoring: true
+    notes: "Ultra-low quiescent current LDO for battery operation"
+  
+  communication:
+    required_functions:
+      - wireless_uplink
+      - long_range_comm
+    baseline_constraints:
+      wireless_protocol: "lora"
+      frequency_band: "868MHz"
+      max_range_km: 10
+    notes: "LoRa transceiver for long-range communication"
+  
+  sensing:
+    required_functions:
+      - data_acquisition
+    baseline_constraints:
+      sensor_interface: "i2c"
+      sensor_types: []
+    notes: "I2C environmental sensors"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - i2c
+  - spi
+  - uart
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: battery_type
+    text: "Battery type?"
+    type: choice
+    choices: ["Li-ion (3.7V)", "Alkaline (2xAA)", "CR2032 Coin Cell", "Solar + Supercap"]
+    priority: high
+    help_text: "Determines voltage range and capacity"
+  
+  - id: battery_life_target
+    text: "Target battery life?"
+    type: choice
+    choices: ["1 month", "6 months", "1 year", "5+ years"]
+    priority: high
+    help_text: "Determines power budget and sleep strategy"
+  
+  - id: sensor_types
+    text: "Sensor types? (select all that apply)"
+    type: choice
+    choices: ["Temperature", "Humidity", "Pressure", "Air Quality", "Light", "Motion", "GPS"]
+    priority: high
+    help_text: "Determines I2C sensors and power budget"
+  
+  - id: wireless_protocol
+    text: "Wireless protocol?"
+    type: choice
+    choices: ["LoRa", "BLE", "Zigbee", "WiFi", "Cellular"]
+    priority: high
+    help_text: "LoRa: long range, low power. BLE: short range, very low power. WiFi: high power"
+  
+  - id: lora_region
+    text: "LoRa frequency band?"
+    type: choice
+    choices: ["US915", "EU868", "AS923", "AU915"]
+    default: "US915"
+    priority: medium
+    help_text: "Regional frequency allocation"
+  
+  - id: sampling_interval
+    text: "Sampling interval (minutes)?"
+    type: number
+    default: 15
+    priority: medium
+    help_text: "How often to wake up and sample sensors"
+  
+  - id: data_logging
+    text: "Local data logging required?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "Requires external flash or SD card"
+  
+  - id: gps_required
+    text: "GPS tracking required?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "Adds GPS module and increases power consumption"
+  
+  - id: enclosure_type
+    text: "Enclosure type?"
+    type: choice
+    choices: ["Indoor", "Outdoor (IP65)", "Harsh (IP67)"]
+    default: "Indoor"
+    priority: low
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # Battery life determines power budget
+  - condition: "battery_life_target == '5+ years'"
+    description: "5+ year battery life requires extreme power optimization"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: deep_sleep_ua_max
+        operation: set
+        value: 0.5
+      - type: update_constraint
+        subsystem: power
+        field: quiescent_current_ua_max
+        operation: set
+        value: 0.5
+  
+  - condition: "battery_life_target == '1 year'"
+    description: "1 year battery life allows moderate power budget"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: deep_sleep_ua_max
+        operation: set
+        value: 2
+  
+  # Wireless protocol selection
+  - condition: "wireless_protocol == 'LoRa'"
+    description: "LoRa requires SPI transceiver"
+    actions:
+      - type: update_constraint
+        subsystem: communication
+        field: wireless_protocol
+        operation: set
+        value: "lora"
+      - type: update_constraint
+        subsystem: communication
+        field: interface
+        operation: set
+        value: "spi"
+  
+  - condition: "wireless_protocol == 'BLE'"
+    description: "BLE can use integrated radio or external module"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: has_ble
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: communication
+        field: wireless_protocol
+        operation: set
+        value: "ble"
+  
+  - condition: "wireless_protocol == 'WiFi'"
+    description: "WiFi requires higher power budget"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: active_ma_max
+        operation: set
+        value: 100
+      - type: update_constraint
+        subsystem: power
+        field: output_current_ma
+        operation: set
+        value: 300
+  
+  # Sensor-specific requirements
+  - condition: "'GPS' in sensor_types"
+    description: "GPS requires UART interface and higher power"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: set
+        value: 2
+      - type: update_constraint
+        subsystem: compute
+        field: active_ma_max
+        operation: add
+        value: 30
+  
+  - condition: "'Air Quality' in sensor_types"
+    description: "Air quality sensors require warm-up time and higher power"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: active_ma_max
+        operation: add
+        value: 50
+  
+  # Data logging
+  - condition: "data_logging == True"
+    description: "Data logging requires external flash or SD card"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.spi
+        operation: set
+        value: 2
+      - type: add_subsystem
+        subsystem: storage
+        value:
+          required_functions: ["data_storage"]
+          baseline_constraints:
+            storage_type: "flash"
+            capacity_mb: 8
+  
+  # Solar power
+  - condition: "battery_type == 'Solar + Supercap'"
+    description: "Solar requires battery management and MPPT"
+    actions:
+      - type: update_constraint
+        subsystem: power
+        field: solar_mppt
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: power
+        field: supercap_management
+        operation: set
+        value: true
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - iot
+  - sensor
+  - wireless
+  - battery_powered
+  - low_power
+  - lora
+  - environmental
+
+author: "HardwareGenius Team"
+created_at: "2026-02-06"
+updated_at: "2026-02-06"
+
+use_cases:
+  - "Smart agriculture soil monitoring"
+  - "Smart city environmental monitoring"
+  - "Industrial asset tracking"
+  - "Wildlife tracking"
+  - "Remote weather stations"
+
+example_products:
+  - "Adafruit Feather M0 LoRa"
+  - "RAK Wireless WisNode"
+  - "Dragino LoRa Shield"
+
+references:
+  - "https://www.semtech.com/lora"
+  - "https://www.thethingsnetwork.org/"
+  - "Application Note: Ultra-Low-Power Design Techniques"

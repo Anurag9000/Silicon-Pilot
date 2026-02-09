@@ -260,7 +260,7 @@ class PDFParser:
             union = area1 + area2 - intersection
             
             return intersection / union if union > 0 else 0.0
-        except:
+        except Exception:
             return 0.0
     
     def render_bbox_snippet(
