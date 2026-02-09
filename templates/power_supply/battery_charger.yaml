@@ -1,0 +1,192 @@
+# Battery Charger Template
+# Standalone battery charging system
+
+id: battery_charger_v1
+version: "1.0"
+device_type: power_supply
+name: "Battery Charger"
+description: "Standalone battery charging system with power path management, fuel gauge, and safety features"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - charge_control
+      - monitoring
+    baseline_constraints:
+      core_arch: ["cortex-m0", "cortex-m0+", "cortex-m3"]
+      min_mhz: 48
+      min_flash_kb: 64
+      min_sram_kb: 16
+      peripherals:
+        i2c: 1
+        adc_channels: 4
+        uart: 1
+    notes: "Low-power MCU for charge control"
+  
+  charger:
+    required_functions:
+      - battery_charging
+    baseline_constraints:
+      chemistry: null
+      max_charge_current_ma: null
+      input_voltage_range: null
+      cell_count: 1
+    notes: "Battery charger IC"
+  
+  fuel_gauge:
+    required_functions:
+      - soc_estimation
+    baseline_constraints:
+      interface: "i2c"
+      chemistry: null
+    optional: true
+    notes: "Optional fuel gauge for SOC estimation"
+  
+  protection:
+    required_functions:
+      - overcurrent
+      - overvoltage
+      - thermal_protection
+    baseline_constraints:
+      fuse: true
+      tvs: true
+    notes: "Protection circuitry"
+  
+  power_path:
+    required_functions:
+      - load_switching
+    baseline_constraints:
+      ideal_diode: true
+    optional: true
+    notes: "Power path management"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - i2c
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: battery_chemistry
+    text: "Battery chemistry?"
+    type: choice
+    choices: ["Li-Ion", "Li-Po", "LiFePO4", "NiMH", "Lead Acid"]
+    priority: high
+  
+  - id: cell_count
+    text: "Number of cells in series?"
+    type: choice
+    choices: ["1", "2", "3", "4", "6", "12"]
+    default: "1"
+    priority: high
+  
+  - id: charge_current
+    text: "Maximum charge current (mA)?"
+    type: choice
+    choices: ["500", "1000", "2000", "3000", "5000"]
+    priority: high
+  
+  - id: input_source
+    text: "Input power source?"
+    type: choice
+    choices: ["USB (5V)", "USB-C PD", "12V Adapter", "Solar Panel", "Wireless"]
+    priority: high
+  
+  - id: fuel_gauge_required
+    text: "Fuel gauge required?"
+    type: boolean
+    default: false
+    priority: medium
+  
+  - id: power_path
+    text: "Power path management?"
+    type: boolean
+    default: true
+    priority: medium
+    help_text: "Allow load operation while charging"
+  
+  - id: safety_features
+    text: "Safety features?"
+    type: choice
+    choices: ["Basic", "Advanced (thermal, timer, JEITA)"]
+    default: "Basic"
+    priority: medium
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  - condition: "battery_chemistry == 'Li-Ion' or battery_chemistry == 'Li-Po'"
+    description: "Li-Ion/Li-Po charging"
+    actions:
+      - type: update_constraint
+        subsystem: charger
+        field: chemistry
+        operation: set
+        value: "li_ion"
+  
+  - condition: "cell_count in ['2', '3', '4']"
+    description: "Multi-cell battery"
+    actions:
+      - type: update_constraint
+        subsystem: charger
+        field: cell_count
+        operation: set
+        value: 2
+  
+  - condition: "fuel_gauge_required == True"
+    description: "Add fuel gauge"
+    actions:
+      - type: update_constraint
+        subsystem: fuel_gauge
+        field: optional
+        operation: set
+        value: false
+  
+  - condition: "power_path == True"
+    description: "Enable power path management"
+    actions:
+      - type: update_constraint
+        subsystem: power_path
+        field: optional
+        operation: set
+        value: false
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - battery
+  - charger
+  - power_management
+  - li_ion
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Portable device chargers"
+  - "Power banks"
+  - "Battery management systems"
+  - "Solar charging systems"
+
+example_products:
+  - "Anker PowerCore chargers"
+  - "Goal Zero solar chargers"
+  - "Tesla Powerwall (scaled up)"
+
+references:
+  - "https://www.ti.com/lit/an/slva731/slva731.pdf"
+  - "Battery Management System Design"

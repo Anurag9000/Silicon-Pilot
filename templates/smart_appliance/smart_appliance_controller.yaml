@@ -1,0 +1,309 @@
+# Smart Appliance Controller Template
+# WiFi-connected smart appliance with relay control
+
+id: smart_appliance_v1
+version: "1.0"
+device_type: smart_appliance
+name: "Smart Appliance Controller"
+description: "WiFi-connected smart appliance controller with relay outputs, sensor inputs, and cloud connectivity"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - wifi_connectivity
+      - relay_control
+      - sensor_reading
+      - cloud_sync
+    baseline_constraints:
+      core_arch: ["cortex-m0+", "cortex-m3", "cortex-m4"]
+      min_mhz: 80
+      min_flash_kb: 256
+      min_sram_kb: 64
+      peripherals:
+        uart: 1
+        spi: 1
+        i2c: 1
+        gpio: 8
+        adc_channels: 4
+      has_wifi: false  # External WiFi module
+    notes: "MCU with sufficient I/O for appliance control"
+  
+  power:
+    required_functions:
+      - ac_dc_conversion
+      - regulation
+    baseline_constraints:
+      input_voltage_ac: 120  # or 230V
+      output_voltage: 3.3
+      output_current_ma: 500
+      isolation: true
+    notes: "AC/DC power supply with isolation"
+  
+  connectivity:
+    required_functions:
+      - wireless_comm
+    baseline_constraints:
+      protocol: "wifi"
+      interface: "uart"
+      cloud_platforms: []
+    notes: "WiFi module for cloud connectivity"
+  
+  switching:
+    required_functions:
+      - load_switching
+    baseline_constraints:
+      relay_count: 2
+      max_voltage_ac: 250
+      max_current_a: 10
+      zero_cross_detection: false
+    notes: "Relay outputs for appliance control"
+  
+  sensing:
+    required_functions:
+      - environmental_sensing
+    baseline_constraints:
+      sensor_types: []
+      interface: "i2c"
+    optional: true
+    notes: "Optional sensors for smart features"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - uart
+  - gpio
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: appliance_type
+    text: "Appliance type?"
+    type: choice
+    choices: ["Smart Plug", "Smart Switch", "Thermostat", "Smart Outlet", "Custom Appliance"]
+    priority: high
+    help_text: "Type of smart appliance"
+  
+  - id: relay_count
+    text: "Number of relay outputs?"
+    type: choice
+    choices: ["1", "2", "4", "8"]
+    default: "2"
+    priority: high
+  
+  - id: max_load_current
+    text: "Maximum load current per relay (A)?"
+    type: choice
+    choices: ["5", "10", "15", "20"]
+    default: "10"
+    priority: high
+  
+  - id: voltage_rating
+    text: "AC voltage rating?"
+    type: choice
+    choices: ["120V (US)", "230V (EU)", "Universal (100-240V)"]
+    default: "Universal (100-240V)"
+    priority: high
+  
+  - id: cloud_platform
+    text: "Cloud platform? (select all that apply)"
+    type: choice
+    choices: ["AWS IoT", "Google Cloud IoT", "Azure IoT", "Custom MQTT", "Alexa", "Google Home"]
+    priority: high
+  
+  - id: sensor_types
+    text: "Built-in sensors? (select all that apply)"
+    type: choice
+    choices: ["None", "Temperature", "Humidity", "Current Sensing", "Power Monitoring", "Motion"]
+    priority: medium
+  
+  - id: local_control
+    text: "Local control interface?"
+    type: choice
+    choices: ["None", "Physical Button", "Touch Sensor", "IR Remote", "Display + Buttons"]
+    default: "Physical Button"
+    priority: medium
+  
+  - id: safety_features
+    text: "Safety features required?"
+    type: choice
+    choices: ["Basic", "Overcurrent Protection", "Thermal Shutdown", "Arc Fault Detection"]
+    default: "Overcurrent Protection"
+    priority: medium
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # Smart plug/outlet
+  - condition: "appliance_type in ['Smart Plug', 'Smart Outlet']"
+    description: "Smart plug requires compact design"
+    actions:
+      - type: update_constraint
+        subsystem: switching
+        field: relay_count
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: compute
+        field: min_flash_kb
+        operation: set
+        value: 128
+  
+  # Thermostat
+  - condition: "appliance_type == 'Thermostat'"
+    description: "Thermostat requires temperature sensor and display"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "temperature"
+      - type: update_constraint
+        subsystem: sensing
+        field: optional
+        operation: set
+        value: false
+      - type: add_subsystem
+        subsystem: display
+        value:
+          required_functions: ["user_interface"]
+          baseline_constraints:
+            display_type: "lcd"
+            interface: "spi"
+  
+  # High relay count
+  - condition: "relay_count in ['4', '8']"
+    description: "Multiple relays require driver IC"
+    actions:
+      - type: update_constraint
+        subsystem: switching
+        field: relay_count
+        operation: set
+        value: 4
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.gpio
+        operation: set
+        value: 16
+  
+  # High current
+  - condition: "max_load_current in ['15', '20']"
+    description: "High current requires robust relays"
+    actions:
+      - type: update_constraint
+        subsystem: switching
+        field: max_current_a
+        operation: set
+        value: 15
+  
+  # Alexa/Google Home
+  - condition: "'Alexa' in cloud_platform or 'Google Home' in cloud_platform"
+    description: "Voice assistant integration"
+    actions:
+      - type: update_constraint
+        subsystem: connectivity
+        field: cloud_platforms
+        operation: append
+        value: "voice_assistant"
+  
+  # Current sensing
+  - condition: "'Current Sensing' in sensor_types or 'Power Monitoring' in sensor_types"
+    description: "Current sensing for power monitoring"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "current_sense"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.adc_channels
+        operation: add
+        value: 2
+  
+  # Temperature sensor
+  - condition: "'Temperature' in sensor_types"
+    description: "Temperature monitoring"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "temperature"
+      - type: update_constraint
+        subsystem: sensing
+        field: optional
+        operation: set
+        value: false
+  
+  # Display interface
+  - condition: "local_control == 'Display + Buttons'"
+    description: "Display for local control"
+    actions:
+      - type: add_subsystem
+        subsystem: display
+        value:
+          required_functions: ["user_interface"]
+          baseline_constraints:
+            display_type: "lcd"
+            interface: "spi"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.gpio
+        operation: add
+        value: 4
+  
+  # Advanced safety
+  - condition: "safety_features in ['Thermal Shutdown', 'Arc Fault Detection']"
+    description: "Advanced safety features"
+    actions:
+      - type: add_subsystem
+        subsystem: protection
+        value:
+          required_functions: ["overcurrent", "thermal_protection"]
+          baseline_constraints:
+            thermal_sensor: true
+            fuse: true
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - smart_home
+  - wifi
+  - relay
+  - iot
+  - cloud_connected
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Smart plugs and outlets"
+  - "Smart light switches"
+  - "Smart thermostats"
+  - "Appliance automation"
+  - "Home automation"
+
+example_products:
+  - "TP-Link Kasa Smart Plug"
+  - "Wemo Smart Plug"
+  - "Nest Thermostat"
+  - "Sonoff switches"
+  - "Shelly relays"
+
+references:
+  - "https://www.espressif.com/en/products/socs/esp8266"
+  - "Application Note: Smart Home Device Design"
+  - "UL 60730 Safety Standard"

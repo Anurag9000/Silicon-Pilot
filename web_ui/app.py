@@ -1,0 +1,592 @@
+"""
+Web UI Prototype for HardwareGenius
+
+Simple FastAPI + HTML/JavaScript frontend for:
+- Template selection
+- Question-answer flow
+- BOM viewing
+- Export functionality
+"""
+
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
+import sys
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from templates.template_system import TemplateLoader
+from llm.intent_classifier import IntentParser, TemplateMatcher
+from architecture.compiler import ArchitectureBuilder, ConstraintCompiler
+from architecture.enhanced_exports import ExportManager
+
+
+# ============================================================================
+# FastAPI App
+# ============================================================================
+
+app = FastAPI(title="HardwareGenius", version="1.0.0")
+
+# Setup templates directory
+templates_dir = Path(__file__).parent / "templates"
+templates_dir.mkdir(exist_ok=True)
+templates = Jinja2Templates(directory=str(templates_dir))
+
+# Global state (would use database in production)
+sessions = {}
+
+# Template loader
+template_loader = TemplateLoader(str(Path(__file__).parent.parent / "templates"))
+
+
+# ============================================================================
+# API Endpoints
+# ============================================================================
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    """Home page"""
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.post("/api/parse-intent")
+async def parse_intent(request: Request):
+    """Parse user intent"""
+    data = await request.json()
+    user_input = data.get("input", "")
+    
+    parser = IntentParser(use_llm=False)
+    intent = parser.parse_intent(user_input)
+    
+    matcher = TemplateMatcher(template_loader)
+    matches = matcher.match_templates(intent)
+    
+    return {
+        "intent": {
+            "device_type": intent.device_type,
+            "keywords": intent.keywords,
+            "extracted_params": intent.extracted_params
+        },
+        "matches": [
+            {
+                "template_id": m.template_id,
+                "confidence": m.confidence,
+                "match_reason": m.match_reason
+            }
+            for m in matches[:5]
+        ]
+    }
+
+
+@app.get("/api/templates")
+async def list_templates():
+    """List all available templates"""
+    templates_list = template_loader.load_all_templates()
+    
+    return {
+        "templates": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "device_type": t.device_type,
+                "description": t.description,
+                "tags": t.tags
+            }
+            for t in templates_list
+        ]
+    }
+
+
+@app.get("/api/templates/{template_id}")
+async def get_template(template_id: str):
+    """Get template details"""
+    template = template_loader.load_template(template_id)
+    
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    return {
+        "id": template.id,
+        "name": template.name,
+        "description": template.description,
+        "device_type": template.device_type,
+        "subsystems": list(template.subsystems.keys()),
+        "questions": [
+            {
+                "id": q.id,
+                "text": q.text,
+                "type": q.type,
+                "choices": q.choices if hasattr(q, 'choices') else None,
+                "default": q.default if hasattr(q, 'default') else None,
+                "priority": q.priority,
+                "help_text": q.help_text if hasattr(q, 'help_text') else None
+            }
+            for q in template.questions
+        ]
+    }
+
+
+@app.post("/api/build-architecture")
+async def build_architecture(request: Request):
+    """Build architecture from template and answers"""
+    data = await request.json()
+    template_id = data.get("template_id")
+    answers = data.get("answers", {})
+    
+    template = template_loader.load_template(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    builder = ArchitectureBuilder()
+    architecture = builder.build_architecture(template, answers)
+    
+    compiler = ConstraintCompiler()
+    req_spec = compiler.compile_constraints(architecture)
+    
+    # Simulate component recommendations
+    bom = [
+        {
+            "category": "MCU",
+            "manufacturer": "STMicroelectronics",
+            "mpn": "STM32F405RGT6",
+            "description": "ARM Cortex-M4, 168MHz, 1MB Flash",
+            "quantity": 1,
+            "price_usd": 5.50
+        }
+    ]
+    
+    return {
+        "architecture": {
+            "subsystems": list(architecture.subsystems.keys()),
+            "subsystem_details": {
+                name: {
+                    "functions": list(subsys.functions),
+                    "constraints": subsys.constraints
+                }
+                for name, subsys in architecture.subsystems.items()
+            }
+        },
+        "bom": bom,
+        "total_cost": sum(item["price_usd"] * item["quantity"] for item in bom)
+    }
+
+
+@app.post("/api/export")
+async def export_design(request: Request):
+    """Export design to various formats"""
+    data = await request.json()
+    format_type = data.get("format", "pdf")
+    bom = data.get("bom", [])
+    config = data.get("config", {})
+    project_name = data.get("project_name", "design")
+    
+    export_manager = ExportManager()
+    output_dir = Path(__file__).parent.parent / "exports"
+    output_dir.mkdir(exist_ok=True)
+    
+    if format_type == "eagle":
+        content = export_manager.eagle.export(bom, project_name)
+        filename = f"{project_name}_eagle.xml"
+    elif format_type == "kicad":
+        content = export_manager.kicad.export(bom)
+        filename = f"{project_name}_kicad.csv"
+    elif format_type == "altium":
+        content = export_manager.altium.export(bom)
+        filename = f"{project_name}_altium.csv"
+    elif format_type == "pdf":
+        content = export_manager.pdf.export(bom, config, project_name)
+        filename = f"{project_name}_report.pdf"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid format")
+    
+    # Save file
+    output_path = output_dir / filename
+    if isinstance(content, bytes):
+        output_path.write_bytes(content)
+    else:
+        output_path.write_text(content)
+    
+    return {
+        "success": True,
+        "filename": filename,
+        "download_url": f"/downloads/{filename}"
+    }
+
+
+@app.get("/downloads/{filename}")
+async def download_file(filename: str):
+    """Download exported file"""
+    file_path = Path(__file__).parent.parent / "exports" / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(file_path, filename=filename)
+
+
+# ============================================================================
+# HTML Template
+# ============================================================================
+
+INDEX_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HardwareGenius - AI Hardware Design Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .input-group input,
+        .input-group textarea,
+        .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus,
+        .input-group textarea:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .results.show {
+            display: block;
+        }
+        
+        .template-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .template-card:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .template-card.selected {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+        
+        .bom-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .bom-table th,
+        .bom-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .bom-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+        
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .export-btn {
+            background: #4caf50;
+            flex: 1;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 HardwareGenius</h1>
+            <p>AI-Powered Hardware Design Assistant</p>
+        </div>
+        
+        <div class="card">
+            <h2>Describe Your Project</h2>
+            <div class="input-group">
+                <label for="user-input">What do you want to build?</label>
+                <textarea id="user-input" rows="3" placeholder="e.g., I want to build a CAN motor controller for BLDC motors"></textarea>
+            </div>
+            <button class="btn" onclick="parseIntent()">Analyze Intent</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="card">
+                <h2>Recommended Templates</h2>
+                <div id="templates-list"></div>
+            </div>
+            
+            <div class="card">
+                <h2>Bill of Materials</h2>
+                <table class="bom-table" id="bom-table">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Manufacturer</th>
+                            <th>Part Number</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bom-tbody"></tbody>
+                </table>
+                <div class="export-buttons">
+                    <button class="btn export-btn" onclick="exportDesign('eagle')">Export Eagle</button>
+                    <button class="btn export-btn" onclick="exportDesign('kicad')">Export KiCad</button>
+                    <button class="btn export-btn" onclick="exportDesign('altium')">Export Altium</button>
+                    <button class="btn export-btn" onclick="exportDesign('pdf')">Export PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentBOM = [];
+        let currentConfig = {};
+        
+        async function parseIntent() {
+            const input = document.getElementById('user-input').value;
+            if (!input.trim()) {
+                alert('Please enter a project description');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/parse-intent', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({input})
+                });
+                
+                const data = await response.json();
+                displayTemplates(data.matches);
+                hideLoading();
+                showResults();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error parsing intent');
+                hideLoading();
+            }
+        }
+        
+        function displayTemplates(matches) {
+            const container = document.getElementById('templates-list');
+            container.innerHTML = matches.map((match, idx) => `
+                <div class="template-card" onclick="selectTemplate('${match.template_id}')">
+                    <h3>${match.template_id}</h3>
+                    <p>Confidence: ${(match.confidence * 100).toFixed(0)}%</p>
+                    <p>${match.match_reason}</p>
+                </div>
+            `).join('');
+        }
+        
+        async function selectTemplate(templateId) {
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/build-architecture', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        template_id: templateId,
+                        answers: {}  // Would collect from UI
+                    })
+                });
+                
+                const data = await response.json();
+                currentBOM = data.bom;
+                displayBOM(data.bom);
+                hideLoading();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error building architecture');
+                hideLoading();
+            }
+        }
+        
+        function displayBOM(bom) {
+            const tbody = document.getElementById('bom-tbody');
+            tbody.innerHTML = bom.map(item => `
+                <tr>
+                    <td>${item.category}</td>
+                    <td>${item.manufacturer}</td>
+                    <td>${item.mpn}</td>
+                    <td>${item.quantity}</td>
+                    <td>$${item.price_usd.toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+        
+        async function exportDesign(format) {
+            try {
+                const response = await fetch('/api/export', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        format,
+                        bom: currentBOM,
+                        config: currentConfig,
+                        project_name: 'MyDesign'
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = data.download_url;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error exporting design');
+            }
+        }
+        
+        function showLoading() {
+            document.getElementById('loading').classList.add('show');
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('show');
+        }
+        
+        function showResults() {
+            document.getElementById('results').classList.add('show');
+        }
+    </script>
+</body>
+</html>
+"""
+
+# Save HTML template
+if __name__ == "__main__":
+    templates_dir = Path(__file__).parent / "templates"
+    templates_dir.mkdir(exist_ok=True)
+    (templates_dir / "index.html").write_text(INDEX_HTML)
+    
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

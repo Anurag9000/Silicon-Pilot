@@ -1,0 +1,213 @@
+# Edge AI Camera Template
+# Computer vision and edge AI processing
+
+id: edge_ai_camera_v1
+version: "1.0"
+device_type: edge_ai
+name: "Edge AI Camera"
+description: "Edge AI camera system with computer vision, object detection, and local inference"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - ai_inference
+      - image_processing
+      - connectivity
+    baseline_constraints:
+      core_arch: ["cortex-m7", "cortex-a"]
+      min_mhz: 400
+      min_flash_kb: 2048
+      min_sram_kb: 1024
+      peripherals:
+        dcmi: 1  # Camera interface
+        dma: 2
+        ethernet: 0
+      has_npu: false  # Neural Processing Unit
+    notes: "High-performance MCU/MPU with AI acceleration"
+  
+  camera:
+    required_functions:
+      - image_capture
+    baseline_constraints:
+      resolution: null
+      interface: "parallel"
+      fps: 30
+    notes: "Camera sensor"
+  
+  ai_accelerator:
+    required_functions:
+      - neural_network_inference
+    baseline_constraints:
+      framework: null  # tensorflow_lite, onnx
+      tops: 1.0  # Tera Operations Per Second
+    optional: true
+    notes: "Optional AI accelerator chip"
+  
+  storage:
+    required_functions:
+      - data_storage
+    baseline_constraints:
+      type: "sd_card"
+      capacity_gb: 32
+    notes: "Storage for images/video"
+  
+  connectivity:
+    required_functions:
+      - data_transmission
+    baseline_constraints:
+      protocol: null
+      interface: null
+    notes: "Network connectivity"
+  
+  power:
+    required_functions:
+      - power_delivery
+    baseline_constraints:
+      input_voltage_range: [5, 12]
+      output_voltages: [3.3, 1.8]
+    notes: "Power management"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - dcmi
+  - sdmmc
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: camera_resolution
+    text: "Camera resolution?"
+    type: choice
+    choices: ["VGA (640x480)", "HD (1280x720)", "Full HD (1920x1080)", "4K (3840x2160)"]
+    priority: high
+  
+  - id: ai_workload
+    text: "AI workload?"
+    type: choice
+    choices: ["Object Detection", "Face Recognition", "Pose Estimation", "Image Classification", "Custom Model"]
+    priority: high
+  
+  - id: inference_location
+    text: "Inference location?"
+    type: choice
+    choices: ["On-device (edge)", "Cloud", "Hybrid"]
+    default: "On-device (edge)"
+    priority: high
+  
+  - id: connectivity_type
+    text: "Connectivity?"
+    type: choice
+    choices: ["WiFi", "Ethernet", "4G/LTE", "WiFi + Ethernet"]
+    priority: high
+  
+  - id: power_source
+    text: "Power source?"
+    type: choice
+    choices: ["USB (5V)", "PoE", "12V Adapter", "Battery"]
+    priority: medium
+  
+  - id: storage_required
+    text: "Local storage required?"
+    type: boolean
+    default: true
+    priority: medium
+  
+  - id: frame_rate
+    text: "Required frame rate?"
+    type: choice
+    choices: ["15 fps", "30 fps", "60 fps"]
+    default: "30 fps"
+    priority: medium
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  - condition: "camera_resolution in ['Full HD (1920x1080)', '4K (3840x2160)']"
+    description: "High resolution requires more processing power"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 800
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: set
+        value: 2048
+  
+  - condition: "ai_workload in ['Object Detection', 'Pose Estimation']"
+    description: "Complex AI requires accelerator"
+    actions:
+      - type: update_constraint
+        subsystem: ai_accelerator
+        field: optional
+        operation: set
+        value: false
+      - type: update_constraint
+        subsystem: ai_accelerator
+        field: tops
+        operation: set
+        value: 2.0
+  
+  - condition: "connectivity_type == 'Ethernet' or connectivity_type == 'WiFi + Ethernet'"
+    description: "Ethernet connectivity"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.ethernet
+        operation: set
+        value: 1
+  
+  - condition: "power_source == 'PoE'"
+    description: "Power over Ethernet"
+    actions:
+      - type: add_subsystem
+        subsystem: poe
+        value:
+          required_functions: ["poe_extraction"]
+          baseline_constraints:
+            standard: "802.3af"
+            power_watts: 15
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - ai
+  - computer_vision
+  - edge_computing
+  - camera
+  - machine_learning
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Smart security cameras"
+  - "Industrial inspection"
+  - "Retail analytics"
+  - "Autonomous vehicles"
+  - "Smart city applications"
+
+example_products:
+  - "Google Nest Cam"
+  - "Amazon Ring"
+  - "NVIDIA Jetson-based cameras"
+
+references:
+  - "https://www.tensorflow.org/lite/microcontrollers"
+  - "Edge AI Hardware Guide"

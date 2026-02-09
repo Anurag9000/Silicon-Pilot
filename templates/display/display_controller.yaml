@@ -1,0 +1,378 @@
+# Display Controller Template
+# Display driver with various interface options
+
+id: display_controller_v1
+version: "1.0"
+device_type: display_controller
+name: "Display Controller"
+description: "Display controller supporting LCD, OLED, and e-paper displays with various interfaces (MIPI-DSI, LVDS, SPI, I2C)"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - display_driving
+      - graphics_rendering
+      - touch_processing
+    baseline_constraints:
+      core_arch: ["cortex-m4", "cortex-m7"]
+      min_mhz: 120
+      min_flash_kb: 512
+      min_sram_kb: 256
+      peripherals:
+        spi: 1
+        i2c: 1
+        ltdc: 0  # LCD-TFT Display Controller
+        dsi: 0   # MIPI-DSI
+      has_dma2d: false
+      has_jpeg: false
+    notes: "MCU with display peripherals"
+  
+  display:
+    required_functions:
+      - visual_output
+    baseline_constraints:
+      display_type: null
+      resolution: null
+      interface: null
+      color_depth_bits: 16
+      refresh_rate_hz: 60
+    notes: "Display panel"
+  
+  graphics:
+    required_functions:
+      - frame_buffer
+    baseline_constraints:
+      frame_buffer_location: "internal_ram"
+      double_buffering: false
+    notes: "Graphics memory and acceleration"
+  
+  touch:
+    required_functions:
+      - touch_input
+    baseline_constraints:
+      touch_type: null
+      interface: "i2c"
+    optional: true
+    notes: "Optional touch controller"
+  
+  power:
+    required_functions:
+      - display_power
+    baseline_constraints:
+      input_voltage_range: [5, 12]
+      output_voltages: [3.3, 5.0]
+      backlight_driver: false
+    notes: "Power for display and backlight"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - spi
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: display_type
+    text: "Display technology?"
+    type: choice
+    choices: ["TFT LCD", "OLED", "E-Paper", "Segment LCD", "LED Matrix"]
+    priority: high
+    help_text: "Type of display panel"
+  
+  - id: resolution
+    text: "Display resolution?"
+    type: choice
+    choices: ["128x64", "240x320", "320x480", "480x800", "800x600", "1024x600", "1920x1080"]
+    priority: high
+  
+  - id: display_size
+    text: "Display size (diagonal inches)?"
+    type: choice
+    choices: ["<2\"", "2-4\"", "4-7\"", "7-10\"", ">10\""]
+    priority: high
+  
+  - id: interface_type
+    text: "Display interface?"
+    type: choice
+    choices: ["SPI", "I2C", "Parallel RGB", "MIPI-DSI", "LVDS"]
+    priority: high
+    help_text: "Interface between MCU and display"
+  
+  - id: touch_required
+    text: "Touch screen required?"
+    type: choice
+    choices: ["None", "Resistive", "Capacitive"]
+    default: "None"
+    priority: medium
+  
+  - id: color_depth
+    text: "Color depth?"
+    type: choice
+    choices: ["Monochrome", "16-bit (65K colors)", "24-bit (16M colors)"]
+    default: "16-bit (65K colors)"
+    priority: medium
+  
+  - id: graphics_acceleration
+    text: "Graphics acceleration needed?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "Hardware graphics acceleration (DMA2D, GPU)"
+  
+  - id: video_playback
+    text: "Video playback required?"
+    type: boolean
+    default: false
+    priority: low
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # Small SPI displays
+  - condition: "resolution in ['128x64', '240x320'] and interface_type == 'SPI'"
+    description: "Small SPI display"
+    actions:
+      - type: update_constraint
+        subsystem: display
+        field: interface
+        operation: set
+        value: "spi"
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: set
+        value: 64
+  
+  # Medium displays with parallel RGB
+  - condition: "resolution in ['320x480', '480x800'] and interface_type == 'Parallel RGB'"
+    description: "Medium display with parallel interface"
+    actions:
+      - type: update_constraint
+        subsystem: display
+        field: interface
+        operation: set
+        value: "parallel_rgb"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.ltdc
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: set
+        value: 512
+  
+  # Large displays with MIPI-DSI
+  - condition: "resolution in ['800x600', '1024x600', '1920x1080'] or interface_type == 'MIPI-DSI'"
+    description: "Large display requires MIPI-DSI"
+    actions:
+      - type: update_constraint
+        subsystem: display
+        field: interface
+        operation: set
+        value: "mipi_dsi"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.dsi
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 200
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: set
+        value: 1024
+      - type: update_constraint
+        subsystem: graphics
+        field: frame_buffer_location
+        operation: set
+        value: "external_ram"
+  
+  # OLED display
+  - condition: "display_type == 'OLED'"
+    description: "OLED display characteristics"
+    actions:
+      - type: update_constraint
+        subsystem: display
+        field: display_type
+        operation: set
+        value: "oled"
+      - type: update_constraint
+        subsystem: power
+        field: backlight_driver
+        operation: set
+        value: false
+  
+  # TFT LCD
+  - condition: "display_type == 'TFT LCD'"
+    description: "TFT LCD requires backlight"
+    actions:
+      - type: update_constraint
+        subsystem: display
+        field: display_type
+        operation: set
+        value: "tft_lcd"
+      - type: update_constraint
+        subsystem: power
+        field: backlight_driver
+        operation: set
+        value: true
+  
+  # E-Paper
+  - condition: "display_type == 'E-Paper'"
+    description: "E-Paper display (low power)"
+    actions:
+      - type: update_constraint
+        subsystem: display
+        field: display_type
+        operation: set
+        value: "epaper"
+      - type: update_constraint
+        subsystem: display
+        field: color_depth_bits
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: power
+        field: backlight_driver
+        operation: set
+        value: false
+  
+  # Capacitive touch
+  - condition: "touch_required == 'Capacitive'"
+    description: "Capacitive touch controller"
+    actions:
+      - type: update_constraint
+        subsystem: touch
+        field: touch_type
+        operation: set
+        value: "capacitive"
+      - type: update_constraint
+        subsystem: touch
+        field: optional
+        operation: set
+        value: false
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.i2c
+        operation: set
+        value: 2
+  
+  # Resistive touch
+  - condition: "touch_required == 'Resistive'"
+    description: "Resistive touch (ADC-based)"
+    actions:
+      - type: update_constraint
+        subsystem: touch
+        field: touch_type
+        operation: set
+        value: "resistive"
+      - type: update_constraint
+        subsystem: touch
+        field: optional
+        operation: set
+        value: false
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.adc_channels
+        operation: add
+        value: 4
+  
+  # Graphics acceleration
+  - condition: "graphics_acceleration == True"
+    description: "Hardware graphics acceleration"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: has_dma2d
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: graphics
+        field: double_buffering
+        operation: set
+        value: true
+  
+  # Video playback
+  - condition: "video_playback == True"
+    description: "Video decoding support"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: has_jpeg
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 200
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 512
+  
+  # 24-bit color
+  - condition: "color_depth == '24-bit (16M colors)'"
+    description: "24-bit color depth"
+    actions:
+      - type: update_constraint
+        subsystem: display
+        field: color_depth_bits
+        operation: set
+        value: 24
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: multiply
+        value: 1.5
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - display
+  - lcd
+  - oled
+  - mipi_dsi
+  - graphics
+  - touch
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Embedded displays"
+  - "HMI panels"
+  - "Instrument clusters"
+  - "Smart displays"
+  - "Digital signage"
+
+example_products:
+  - "STM32 Discovery kits with displays"
+  - "Raspberry Pi displays"
+  - "Nextion HMI displays"
+  - "Waveshare e-paper displays"
+
+references:
+  - "https://www.st.com/en/applications/human-machine-interface.html"
+  - "MIPI-DSI Specification"
+  - "Application Note: TFT LCD Interface Design"
