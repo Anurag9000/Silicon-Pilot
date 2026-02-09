@@ -1,62 +1,103 @@
-# ⚡ Silicon-Pilot (Production Grade)
+# ⚡ HardwareGenius (Production Grade)
 
-**Engineering-Grade MCU & Component Selection System**
+**Engineering-Grade AI Hardware Architect & Component Recommender**
 
-Silicon-Pilot is a **deterministic, parametric hardware-selection engine** that provides evidence-backed recommendations for microcontrollers. Unlike generic AI chatbots, Silicon-Pilot uses a **deterministic constraint solver** over a **PostgreSQL parametric database** with **full provenance**.
+HardwareGenius is a **deterministic, parametric hardware-selection engine** that provides evidence-backed recommendations. Unlike generic AI chatbots, it uses a **deterministic constraint solver** over a **PostgreSQL parametric database** with **full provenance**.
 
-Every recommendation is deterministic, constraint-verified, and citation-backed with datasheet references, including rendered snippets of the source documents.
+Every recommendation is **deterministic**, **constraint-verified**, and **citation-backed** with datasheet references.
+
+![Status](https://img.shields.io/badge/Status-Production_Ready-success)
+![Coverage](https://img.shields.io/badge/Evidence-100%25_Grounded-blue)
+![Architecture](https://img.shields.io/badge/Architecture-Hybrid_Neurosymbolic-purple)
+
+---
+
+## 🛡️ Anti-Hallucination Architecture
+
+We use a strict 6-layer architecture to ensure **zero hallucination** of hardware specifications.
+
+```mermaid
+graph TD
+    subgraph "Truth Layer (Deterministic)"
+        DB[(PostgreSQL\nParametric DB)]
+        Datasheets[Datasheets\n(PDF/HTML)]
+        Evidence[Evidence Store\n(Snippets/BBox)]
+    end
+
+    subgraph "Logic Layer (Verified)"
+        Solver[Deterministic Solver\n(Hard Constraints)]
+        Validator[Constraint\nValidator]
+        Compiler[Architecture\nCompiler]
+    end
+
+    subgraph "Interface Layer (LLM)"
+        Intent[User Intent\nParser]
+        Optimizer[Intelligent\nOptimizer]
+        Explainer[Natural Language\nExplainer]
+    end
+
+    Datasheets -->|Ingestion| DB
+    Datasheets -->|Extraction| Evidence
+    DB --> Solver
+    
+    Intent --> Compiler
+    Compiler -->|Baseline| Optimizer
+    Optimizer -->|Optimization| Validator
+    Validator -->|Verified Constraints| Solver
+    
+    Solver -->|Candidates| Explainer
+    Evidence -->|Citations| Explainer
+    Explainer -->|Verified Response| User([User])
+
+    style DB fill:#e1f5fe,stroke:#01579b
+    style Solver fill:#e8f5e9,stroke:#2e7d32
+    style Intent fill:#fff3e0,stroke:#ef6c00
+    style Validator fill:#fce4ec,stroke:#880e4f
+```
+
+[**📖 Read Full Anti-Hallucination Guide**](docs/ANTI_HALLUCINATION.md)
 
 ---
 
 ## 🚀 Key Features
 
+### 🧠 Intelligent Architecture Synthesis
+- **Intent-to-Spec**: Converts "I want to build a drone" into engineering constraints.
+- **Smart Optimization**: LLM suggests optimizations (e.g., "Use TIM1 for BLDC FOC") that are validated against hardware reality.
+- **Context-Aware**: Adapts recommendations for prototypes vs. mass production.
+
 ### ⚙️ Deterministic Selection Engine
 - **Zero Hallucination**: No specs are invented. All data is verified from manufacturers.
 - **100% Constraint Satisfaction**: Hard requirements are guaranteed to be met.
-- **Stable Results**: Same input → Same output (tested over 100 runs).
-
-### 📊 Parametric PostgreSQL Database
-- **Exhaustive STM32 Support**: Ingested data for all major STM32 families.
-- **Evidence-Backed Fields**: Every spec field (Flash, RAM, Peripherals, Voltage) links to a source URL, page, and bbox.
-- **Conflict Detection**: Identifies and flags discrepancies between different manufacturer sources.
+- **Multi-Subsystem Solving**: simultaneously solves for MCU, Power, Comms, and Sensors.
 
 ### 📚 Evidence-Backed RAG
 - **Datasheet Provenance**: Direct links to manufacturer PDFs.
 - **Snippet Rendering**: Visual proof for every recommended value.
-- **Zero-Trust Logic**: Only publishes data above a specific confidence threshold.
-
-### 🤖 AI Reasoning Layer
-- **NL → Constraint Parsing**: Converts "I want to build a drone" into engineering requirements.
-- **Information Gain Q&A**: Asks only the high-leverage questions to narrow down the search.
-- **Explainable Scoring**: Provides a detailed breakdown of why one part is ranked higher than another.
+- **Conflict Detection**: Identifies discrepancies between sources.
 
 ---
 
-## 🏗️ System Architecture
+## 📖 Key Documentation
 
-```mermaid
-graph TD
-    User([User]) --> Orchestrator[LLM Orchestrator]
-    Orchestrator --> Solver[Deterministic Solver]
-    Orchestrator --> QuestionEngine[Question Engine]
-    Solver --> DB[(PostgreSQL)]
-    Ingestion[Ingestion Pipeline] --> DB
-    Ingestion --> S3[(MinIO/S3)]
-    S3 --> EvidenceViewer[Evidence Viewer]
-```
+### Core Architecture
+| Document | Description |
+|----------|-------------|
+| [**System Pipeline**](docs/PIPELINE.md) | Visual guide to Architecture Compiler & Solvers. |
+| [**Anti-Hallucination**](docs/ANTI_HALLUCINATION.md) | How we prevent AI errors (6-layer architecture). |
+| [**System Architecture**](docs/SYSTEM.md) | Technical deep dive into filters & solvers. |
+| [**LLM Roadmap**](docs/LLM_ROADMAP.md) | Plan for advanced intelligence features. |
 
+### Guides & Operations
+| Document | Description |
+|----------|-------------|
+| [**Deployment Guide**](docs/DEPLOYMENT.md) | Production setup (Docker/Cloud). |
+| [**Run Instructions**](docs/RUNNING.md) | Local development setup. |
+| [**Data Ingestion**](docs/DATA_INGESTION.md) | How to collect & ingest datasheets. |
+| [**Testing Guide**](docs/TESTING.md) | Unit, Integration, and Golden tests. |
 ---
 
-## 📖 Documentation
-
-- [**RUN_INSTRUCTIONS.md**](RUN_INSTRUCTIONS.md): Detailed setup for Docker and Local environments.
-- [**TEST_GUIDE.md**](TEST_GUIDE.md): Guide to running unit, integration, and golden tests.
-- [**DATA_INGESTION_GUIDE.md**](DATA_INGESTION_GUIDE.md): How to collect and ingest real datasheet data.
-- [**SYSTEM_ARCHITECTURE.md**](SYSTEM_ARCHITECTURE.md): Technical deep dive into filters, solvers, and extraction.
-
----
-
-## 🚀 Quick Start (Production)
+## 🏗️ Quick Start
 
 ### 1. Requirements
 - Docker & Docker Compose
@@ -64,20 +105,13 @@ graph TD
 
 ### 2. Startup
 ```powershell
-cp .env.template .env
 # Edit .env and add your OPENAI_API_KEY
 docker compose up -d
 ```
 
-### 3. Exhaustive Data Ingestion
-```powershell
-python scripts/collect_stm32_datasheets.py
-python scripts/ingest_datasheets.py
-```
-
-### 4. API & Verification
-- **API Docs**: `http://localhost:8000/docs`
-- **Verification**: `python quick_test.py`
+### 3. Access
+- **Web UI**: `http://localhost:8001`
+- **API Docs**: `http://localhost:8001/docs`
 
 ---
 
@@ -86,15 +120,12 @@ python scripts/ingest_datasheets.py
 | Component | Status | Description |
 |-----------|--------|-------------|
 | **Database** | ✅ Done | PostgreSQL with evidence tracking |
-| **Ingestion** | ✅ Done | Multi-strategy PDF/Table/OCR extraction |
+| **Ingestion** | ✅ Done | Automated extraction for STM32, TI, NXP |
 | **Solver** | ✅ Done | Zero-tolerance hard filter + ranking |
-| **AI Layer** | ✅ Done | NLP parser + Question Engine |
-| **Evidence** | ✅ Done | S3 snippet rendering & provenance |
+| **AI Layer** | ✅ Done | Intelligent Optimizer + Question Engine |
+| **Web UI** | ✅ Done | Production-grade React/FastAPI interface |
 
 ---
 
-## 📄 License
-MIT License - Developed for Advanced Agentic Coding.
-
-**Author:** [Anurag9000](https://github.com/Anurag9000)
-**Version:** 1.0.0 (Silicon-Pilot MVP)
+**Version:** 1.0.0 (Production Release)
+**License:** MIT

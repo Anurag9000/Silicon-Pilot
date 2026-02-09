@@ -147,14 +147,42 @@ class ConstraintCompiler:
     Compiles ArchitectureGraph into RequirementSpec for deterministic solver.
     
     This is the bridge between high-level architecture and low-level constraints.
+    
+    NEW: Includes intelligent constraint optimization using LLM.
     """
     
-    def compile(self, graph: ArchitectureGraph) -> RequirementSpec:
+    def __init__(self, use_intelligent_optimization: bool = True):
+        """
+        Initialize compiler.
+        
+        Args:
+            use_intelligent_optimization: Enable LLM-driven constraint optimization
+        """
+        self.use_intelligent_optimization = use_intelligent_optimization
+        
+        if use_intelligent_optimization:
+            try:
+                from architecture.intelligent_optimizer import IntelligentConstraintOptimizer
+                self.optimizer = IntelligentConstraintOptimizer()
+            except ImportError:
+                print("Warning: Intelligent optimizer not available")
+                self.optimizer = None
+        else:
+            self.optimizer = None
+    
+    def compile(
+        self,
+        graph: ArchitectureGraph,
+        user_requirements: Optional[Dict[str, Any]] = None,
+        template_context: Optional[Dict[str, Any]] = None
+    ) -> RequirementSpec:
         """
         Compile architecture graph into requirement spec.
         
         Args:
             graph: Architecture graph with subsystems and constraints
+            user_requirements: Optional user requirements for optimization
+            template_context: Optional template context for optimization
             
         Returns:
             RequirementSpec for deterministic solver
@@ -188,6 +216,74 @@ class ConstraintCompiler:
         for key, value in graph.additional_constraints.items():
             if not hasattr(spec, key):
                 setattr(spec, key, value)
+        
+        # INTELLIGENT OPTIMIZATION (NEW!)
+        if self.optimizer and user_requirements and template_context:
+            spec = self._apply_intelligent_optimization(
+                spec, user_requirements, template_context
+            )
+        
+        return spec
+    
+    def _apply_intelligent_optimization(
+        self,
+        spec: RequirementSpec,
+        user_requirements: Dict[str, Any],
+        template_context: Dict[str, Any]
+    ) -> RequirementSpec:
+        """Apply intelligent constraint optimization"""
+        
+        # Convert spec to dict for optimization
+        baseline_constraints = {
+            "core_arch": getattr(spec, 'core', None),
+            "min_flash_kb": getattr(spec, 'flash_kb_min', None),
+            "min_sram_kb": getattr(spec, 'sram_kb_min', None),
+            "min_mhz": getattr(spec, 'min_mhz', None),
+            "peripherals_min": getattr(spec, 'peripherals_min', {}),
+            "has_fpu": getattr(spec, 'has_fpu', False),
+            "has_dsp": getattr(spec, 'has_dsp', False)
+        }
+        
+        # Remove None values
+        baseline_constraints = {k: v for k, v in baseline_constraints.items() if v is not None}
+        
+        # Optimize
+        result = self.optimizer.optimize_constraints(
+            baseline_constraints=baseline_constraints,
+            user_requirements=user_requirements,
+            template_context=template_context
+        )
+        
+        # Apply optimizations back to spec
+        optimized = result.optimized_constraints
+        
+        if 'core_arch' in optimized:
+            spec.core = optimized['core_arch']
+        if 'min_flash_kb' in optimized:
+            spec.flash_kb_min = optimized['min_flash_kb']
+        if 'min_sram_kb' in optimized:
+            spec.sram_kb_min = optimized['min_sram_kb']
+        if 'min_mhz' in optimized:
+            spec.min_mhz = optimized['min_mhz']
+        if 'peripherals_min' in optimized:
+            spec.peripherals_min = optimized['peripherals_min']
+        if 'has_fpu' in optimized:
+            spec.has_fpu = optimized['has_fpu']
+        if 'has_dsp' in optimized:
+            spec.has_dsp = optimized['has_dsp']
+        
+        # Store optimization metadata
+        spec.optimization_applied = True
+        spec.optimization_confidence = result.confidence_score
+        spec.optimizations = [
+            {
+                "field": opt.field,
+                "original": opt.original_value,
+                "optimized": opt.optimized_value,
+                "reasoning": opt.reasoning
+            }
+            for opt in result.optimizations
+        ]
         
         return spec
     
