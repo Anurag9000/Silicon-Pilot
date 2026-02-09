@@ -1,0 +1,361 @@
+# Audio Device Template
+# Digital audio device with DAC, amplifier, and connectivity
+
+id: audio_device_v1
+version: "1.0"
+device_type: audio_device
+name: "Audio Device"
+description: "Digital audio device with high-quality DAC, amplifier, and wireless/wired connectivity"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - audio_processing
+      - codec_decoding
+      - user_interface
+    baseline_constraints:
+      core_arch: ["cortex-m4", "cortex-m7"]
+      min_mhz: 120
+      min_flash_kb: 512
+      min_sram_kb: 128
+      peripherals:
+        i2s: 1
+        i2c: 1
+        spi: 1
+        uart: 1
+        usb_fs: 1
+      has_fpu: true
+      has_dsp: true
+    notes: "MCU with DSP and I2S for audio"
+  
+  audio_codec:
+    required_functions:
+      - dac
+      - adc
+    baseline_constraints:
+      dac_resolution_bits: 24
+      sample_rate_khz: 48
+      channels: 2
+      snr_db: 100
+    notes: "High-quality audio codec"
+  
+  amplifier:
+    required_functions:
+      - audio_amplification
+    baseline_constraints:
+      amplifier_type: "class_d"
+      output_power_w: 10
+      thd_percent: 0.1
+    notes: "Audio amplifier"
+  
+  connectivity:
+    required_functions:
+      - audio_input
+    baseline_constraints:
+      input_types: []
+      wireless: false
+    notes: "Audio input connectivity"
+  
+  power:
+    required_functions:
+      - low_noise_power
+    baseline_constraints:
+      input_voltage_range: [5, 12]
+      output_voltage: 3.3
+      output_current_ma: 500
+      low_noise: true
+    notes: "Low-noise power for audio quality"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - i2s
+  - i2c
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: device_category
+    text: "Audio device category?"
+    type: choice
+    choices: ["Bluetooth Speaker", "WiFi Speaker", "Headphone Amplifier", "DAC/Streamer", "Smart Speaker"]
+    priority: high
+  
+  - id: audio_quality
+    text: "Audio quality target?"
+    type: choice
+    choices: ["Consumer (16-bit/44.1kHz)", "Hi-Fi (24-bit/96kHz)", "Studio (24-bit/192kHz)"]
+    default: "Hi-Fi (24-bit/96kHz)"
+    priority: high
+  
+  - id: output_power
+    text: "Output power per channel (W)?"
+    type: choice
+    choices: ["5", "10", "20", "50", "100+"]
+    default: "10"
+    priority: high
+  
+  - id: wireless_protocol
+    text: "Wireless connectivity? (select all that apply)"
+    type: choice
+    choices: ["None", "Bluetooth", "WiFi", "AirPlay", "Chromecast"]
+    priority: high
+  
+  - id: wired_inputs
+    text: "Wired inputs? (select all that apply)"
+    type: choice
+    choices: ["USB", "Optical (SPDIF)", "Coaxial (SPDIF)", "Analog (3.5mm)", "Balanced (XLR)"]
+    priority: medium
+  
+  - id: voice_assistant
+    text: "Voice assistant integration?"
+    type: choice
+    choices: ["None", "Alexa", "Google Assistant", "Custom"]
+    default: "None"
+    priority: medium
+  
+  - id: battery_powered
+    text: "Battery powered?"
+    type: boolean
+    default: false
+    priority: medium
+  
+  - id: display_required
+    text: "Display required?"
+    type: choice
+    choices: ["None", "OLED (small)", "LCD (color)", "LED indicators only"]
+    default: "LED indicators only"
+    priority: low
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # Hi-Fi audio quality
+  - condition: "audio_quality == 'Hi-Fi (24-bit/96kHz)'"
+    description: "Hi-Fi requires 24-bit DAC at 96kHz"
+    actions:
+      - type: update_constraint
+        subsystem: audio_codec
+        field: dac_resolution_bits
+        operation: set
+        value: 24
+      - type: update_constraint
+        subsystem: audio_codec
+        field: sample_rate_khz
+        operation: set
+        value: 96
+      - type: update_constraint
+        subsystem: audio_codec
+        field: snr_db
+        operation: set
+        value: 110
+  
+  # Studio audio quality
+  - condition: "audio_quality == 'Studio (24-bit/192kHz)'"
+    description: "Studio quality requires 24-bit DAC at 192kHz"
+    actions:
+      - type: update_constraint
+        subsystem: audio_codec
+        field: dac_resolution_bits
+        operation: set
+        value: 24
+      - type: update_constraint
+        subsystem: audio_codec
+        field: sample_rate_khz
+        operation: set
+        value: 192
+      - type: update_constraint
+        subsystem: audio_codec
+        field: snr_db
+        operation: set
+        value: 120
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 200
+  
+  # High output power
+  - condition: "output_power in ['50', '100+']"
+    description: "High power requires Class D amplifier"
+    actions:
+      - type: update_constraint
+        subsystem: amplifier
+        field: output_power_w
+        operation: set
+        value: 50
+      - type: update_constraint
+        subsystem: amplifier
+        field: amplifier_type
+        operation: set
+        value: "class_d"
+  
+  # Bluetooth
+  - condition: "'Bluetooth' in wireless_protocol"
+    description: "Bluetooth requires BLE module or integrated BT"
+    actions:
+      - type: update_constraint
+        subsystem: connectivity
+        field: wireless
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: connectivity
+        field: input_types
+        operation: append
+        value: "bluetooth"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: add
+        value: 1
+  
+  # WiFi
+  - condition: "'WiFi' in wireless_protocol"
+    description: "WiFi for streaming"
+    actions:
+      - type: update_constraint
+        subsystem: connectivity
+        field: wireless
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: connectivity
+        field: input_types
+        operation: append
+        value: "wifi"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.spi
+        operation: add
+        value: 1
+  
+  # USB input
+  - condition: "'USB' in wired_inputs"
+    description: "USB audio input"
+    actions:
+      - type: update_constraint
+        subsystem: connectivity
+        field: input_types
+        operation: append
+        value: "usb"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.usb_fs
+        operation: set
+        value: 1
+  
+  # Optical SPDIF
+  - condition: "'Optical (SPDIF)' in wired_inputs"
+    description: "Optical SPDIF input"
+    actions:
+      - type: update_constraint
+        subsystem: connectivity
+        field: input_types
+        operation: append
+        value: "spdif_optical"
+      - type: add_subsystem
+        subsystem: spdif_receiver
+        value:
+          required_functions: ["digital_audio_input"]
+          baseline_constraints:
+            interface: "optical"
+  
+  # Voice assistant
+  - condition: "voice_assistant in ['Alexa', 'Google Assistant']"
+    description: "Voice assistant requires microphone array"
+    actions:
+      - type: add_subsystem
+        subsystem: microphone
+        value:
+          required_functions: ["voice_capture", "echo_cancellation"]
+          baseline_constraints:
+            mic_count: 2
+            interface: "i2s"
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 128
+      - type: update_constraint
+        subsystem: compute
+        field: min_flash_kb
+        operation: add
+        value: 512
+  
+  # Battery powered
+  - condition: "battery_powered == True"
+    description: "Battery requires charging circuit"
+    actions:
+      - type: update_constraint
+        subsystem: power
+        field: battery_charger
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: power
+        field: battery_type
+        operation: set
+        value: "li_ion"
+  
+  # Color display
+  - condition: "display_required == 'LCD (color)'"
+    description: "Color display requires SPI and more memory"
+    actions:
+      - type: add_subsystem
+        subsystem: display
+        value:
+          required_functions: ["visual_feedback"]
+          baseline_constraints:
+            display_type: "lcd_color"
+            interface: "spi"
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 32
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - audio
+  - dac
+  - amplifier
+  - bluetooth
+  - wifi
+  - streaming
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Bluetooth speakers"
+  - "WiFi streaming speakers"
+  - "Headphone amplifiers"
+  - "Smart speakers"
+  - "Multi-room audio"
+
+example_products:
+  - "Sonos speakers"
+  - "JBL Bluetooth speakers"
+  - "Schiit Audio DACs"
+  - "Amazon Echo"
+  - "Google Home"
+
+references:
+  - "https://www.ti.com/audio/overview.html"
+  - "I2S Audio Interface Specification"
+  - "Application Note: High-Quality Audio Design"

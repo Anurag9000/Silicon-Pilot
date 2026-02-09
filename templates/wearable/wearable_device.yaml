@@ -1,0 +1,326 @@
+# Wearable Device Template
+# Battery-powered wearable with BLE and sensors
+
+id: wearable_device_v1
+version: "1.0"
+device_type: wearable
+name: "Wearable Device"
+description: "Battery-powered wearable device with BLE connectivity and health/fitness sensors"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - sensor_fusion
+      - ble_comm
+      - power_management
+    baseline_constraints:
+      core_arch: ["cortex-m0+", "cortex-m4"]
+      min_mhz: 32
+      min_flash_kb: 256
+      min_sram_kb: 32
+      peripherals:
+        i2c: 1
+        spi: 1
+        adc_channels: 2
+      power_profile: ultra_low_power
+      deep_sleep_ua_max: 2
+      active_ma_max: 15
+      has_ble: true
+    notes: "Ultra-low-power MCU with integrated BLE"
+  
+  power:
+    required_functions:
+      - battery_management
+      - charging
+    baseline_constraints:
+      battery_type: "li_ion"
+      battery_voltage: 3.7
+      charging_method: "usb"
+      fuel_gauge: false
+    notes: "Battery charging and management"
+  
+  sensing:
+    required_functions:
+      - health_monitoring
+    baseline_constraints:
+      sensor_types: []
+      sensor_interface: "i2c"
+    notes: "Health and fitness sensors"
+  
+  user_interface:
+    required_functions:
+      - local_feedback
+    baseline_constraints:
+      display_type: null
+      haptic_feedback: false
+      led_count: 1
+    notes: "User interface elements"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - i2c
+  - ble
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: device_category
+    text: "Wearable category?"
+    type: choice
+    choices: ["Fitness Tracker", "Smartwatch", "Health Monitor", "Smart Ring", "Smart Glasses"]
+    priority: high
+    help_text: "Determines feature set and form factor"
+  
+  - id: sensor_types
+    text: "Required sensors? (select all that apply)"
+    type: choice
+    choices: ["Heart Rate", "SpO2", "Accelerometer", "Gyroscope", "Temperature", "ECG", "Pressure"]
+    priority: high
+    help_text: "Health and fitness sensors"
+  
+  - id: display_required
+    text: "Display required?"
+    type: choice
+    choices: ["None", "OLED (small)", "LCD (color)", "E-ink"]
+    default: "OLED (small)"
+    priority: high
+  
+  - id: battery_life_target
+    text: "Battery life target?"
+    type: choice
+    choices: ["1-2 days", "3-5 days", "1-2 weeks", "1+ month"]
+    default: "3-5 days"
+    priority: high
+  
+  - id: water_resistance
+    text: "Water resistance level?"
+    type: choice
+    choices: ["None", "Splash Resistant (IP67)", "Swim Proof (5ATM)", "Dive Proof (10ATM)"]
+    default: "Splash Resistant (IP67)"
+    priority: medium
+  
+  - id: gps_required
+    text: "GPS required?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "For outdoor activity tracking"
+  
+  - id: nfc_required
+    text: "NFC for payments?"
+    type: boolean
+    default: false
+    priority: low
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # Smartwatch features
+  - condition: "device_category == 'Smartwatch'"
+    description: "Smartwatch requires display and more memory"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_flash_kb
+        operation: set
+        value: 512
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: set
+        value: 64
+      - type: update_constraint
+        subsystem: user_interface
+        field: display_type
+        operation: set
+        value: "oled"
+  
+  # Heart rate sensor
+  - condition: "'Heart Rate' in sensor_types"
+    description: "Heart rate requires optical sensor"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "heart_rate"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.adc_channels
+        operation: add
+        value: 2
+  
+  # SpO2 sensor
+  - condition: "'SpO2' in sensor_types"
+    description: "SpO2 requires optical sensor with red and IR LEDs"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "spo2"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.adc_channels
+        operation: add
+        value: 2
+  
+  # Accelerometer
+  - condition: "'Accelerometer' in sensor_types"
+    description: "Accelerometer for motion tracking"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "accelerometer"
+  
+  # Gyroscope
+  - condition: "'Gyroscope' in sensor_types"
+    description: "Gyroscope for orientation tracking"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "gyroscope"
+  
+  # ECG
+  - condition: "'ECG' in sensor_types"
+    description: "ECG requires high-precision ADC"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: sensor_types
+        operation: append
+        value: "ecg"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.adc_channels
+        operation: add
+        value: 4
+      - type: update_constraint
+        subsystem: compute
+        field: adc_resolution_bits
+        operation: set
+        value: 16
+  
+  # Color display
+  - condition: "display_required == 'LCD (color)'"
+    description: "Color LCD requires more memory and SPI"
+    actions:
+      - type: update_constraint
+        subsystem: user_interface
+        field: display_type
+        operation: set
+        value: "lcd_color"
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 32
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.spi
+        operation: set
+        value: 2
+  
+  # Long battery life
+  - condition: "battery_life_target in ['1-2 weeks', '1+ month']"
+    description: "Long battery life requires extreme power optimization"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: deep_sleep_ua_max
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: power
+        field: fuel_gauge
+        operation: set
+        value: true
+  
+  # GPS
+  - condition: "gps_required == True"
+    description: "GPS requires UART interface"
+    actions:
+      - type: add_subsystem
+        subsystem: positioning
+        value:
+          required_functions: ["gps_tracking"]
+          baseline_constraints:
+            gps_module: true
+            interface: "uart"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: set
+        value: 1
+      - type: update_constraint
+        subsystem: power
+        field: battery_capacity_mah_min
+        operation: set
+        value: 300
+  
+  # NFC
+  - condition: "nfc_required == True"
+    description: "NFC for contactless payments"
+    actions:
+      - type: add_subsystem
+        subsystem: nfc
+        value:
+          required_functions: ["contactless_payment"]
+          baseline_constraints:
+            nfc_controller: true
+            interface: "i2c"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.i2c
+        operation: set
+        value: 2
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - wearable
+  - fitness
+  - health
+  - ble
+  - battery_powered
+  - ultra_low_power
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Fitness tracking"
+  - "Health monitoring"
+  - "Sleep tracking"
+  - "Activity tracking"
+  - "Medical wearables"
+
+example_products:
+  - "Fitbit"
+  - "Apple Watch"
+  - "Garmin fitness trackers"
+  - "Whoop Strap"
+  - "Oura Ring"
+
+references:
+  - "https://www.nordicsemi.com/Products/Wearables"
+  - "Application Note: Ultra-Low-Power Wearable Design"
+  - "BLE for Wearables Best Practices"

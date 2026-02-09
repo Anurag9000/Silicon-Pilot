@@ -1,0 +1,365 @@
+# Robotics Controller Template
+# Multi-motor robotics controller with sensors and communication
+
+id: robotics_controller_v1
+version: "1.0"
+device_type: robotics_controller
+name: "Robotics Controller"
+description: "Multi-axis robotics controller with motor control, sensor fusion, and real-time communication"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - motor_control
+      - sensor_fusion
+      - trajectory_planning
+      - kinematics
+    baseline_constraints:
+      core_arch: ["cortex-m4", "cortex-m7"]
+      min_mhz: 168
+      min_flash_kb: 512
+      min_sram_kb: 128
+      peripherals:
+        pwm_timers: 8
+        encoder_inputs: 4
+        adc_channels: 8
+        uart: 2
+        spi: 2
+        i2c: 1
+        can: 1
+      has_fpu: true
+      has_dsp: true
+    notes: "High-performance MCU for real-time control"
+  
+  power:
+    required_functions:
+      - multi_rail_power
+    baseline_constraints:
+      input_voltage_range: [12, 24]
+      output_voltages: [3.3, 5.0]
+      output_current_ma: 2000
+    notes: "Power for MCU, motors, and sensors"
+  
+  motor_control:
+    required_functions:
+      - multi_axis_control
+    baseline_constraints:
+      motor_count: 4
+      motor_type: "dc"
+      max_current_a: 5
+      encoder_feedback: true
+    notes: "Motor drivers with encoder feedback"
+  
+  sensing:
+    required_functions:
+      - position_sensing
+      - imu
+    baseline_constraints:
+      imu_required: true
+      force_torque_sensor: false
+    notes: "IMU and optional force/torque sensors"
+  
+  communication:
+    required_functions:
+      - real_time_comm
+    baseline_constraints:
+      protocol: "can"
+      wireless: false
+    notes: "Real-time communication bus"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - pwm
+  - encoder
+  - i2c
+  - can
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: robot_type
+    text: "Robot type?"
+    type: choice
+    choices: ["Mobile Robot", "Manipulator (Arm)", "Drone", "Humanoid", "Custom"]
+    priority: high
+    help_text: "Determines motor and sensor requirements"
+  
+  - id: motor_count
+    text: "Number of motors/servos?"
+    type: choice
+    choices: ["2", "4", "6", "8+"]
+    priority: high
+  
+  - id: motor_type
+    text: "Motor type?"
+    type: choice
+    choices: ["DC Brushed", "BLDC", "Stepper", "Servo (PWM)", "Mixed"]
+    priority: high
+  
+  - id: max_motor_current
+    text: "Maximum motor current (A)?"
+    type: choice
+    choices: ["1", "3", "5", "10", "20+"]
+    default: "5"
+    priority: high
+  
+  - id: sensor_suite
+    text: "Sensor suite? (select all that apply)"
+    type: choice
+    choices: ["IMU (Accel+Gyro)", "Magnetometer", "GPS", "LiDAR", "Camera", "Force/Torque", "Ultrasonic"]
+    priority: high
+  
+  - id: communication_protocol
+    text: "Communication protocol?"
+    type: choice
+    choices: ["CAN", "Ethernet", "WiFi", "ROS (Serial)", "Custom"]
+    default: "CAN"
+    priority: medium
+  
+  - id: safety_features
+    text: "Safety features required?"
+    type: choice
+    choices: ["Basic (E-stop)", "Enhanced (Collision Detection)", "Certified (ISO 13849)"]
+    default: "Basic (E-stop)"
+    priority: medium
+  
+  - id: power_source
+    text: "Power source?"
+    type: choice
+    choices: ["Battery (Li-ion)", "Wall Adapter", "Both"]
+    default: "Battery (Li-ion)"
+    priority: medium
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # Mobile robot
+  - condition: "robot_type == 'Mobile Robot'"
+    description: "Mobile robot requires wheel encoders and IMU"
+    actions:
+      - type: update_constraint
+        subsystem: motor_control
+        field: motor_count
+        operation: set
+        value: 2
+      - type: update_constraint
+        subsystem: sensing
+        field: imu_required
+        operation: set
+        value: true
+  
+  # Manipulator
+  - condition: "robot_type == 'Manipulator (Arm)'"
+    description: "Manipulator requires multi-axis control and kinematics"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 200
+      - type: update_constraint
+        subsystem: motor_control
+        field: motor_count
+        operation: set
+        value: 6
+  
+  # Drone
+  - condition: "robot_type == 'Drone'"
+    description: "Drone requires high-speed motor control and IMU"
+    actions:
+      - type: update_constraint
+        subsystem: motor_control
+        field: motor_type
+        operation: set
+        value: "bldc"
+      - type: update_constraint
+        subsystem: motor_control
+        field: motor_count
+        operation: set
+        value: 4
+      - type: update_constraint
+        subsystem: sensing
+        field: imu_required
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 200
+  
+  # BLDC motors
+  - condition: "motor_type == 'BLDC'"
+    description: "BLDC requires 3-phase control"
+    actions:
+      - type: update_constraint
+        subsystem: motor_control
+        field: motor_type
+        operation: set
+        value: "bldc"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.pwm_timers
+        operation: set
+        value: 12
+      - type: update_constraint
+        subsystem: compute
+        field: min_flash_kb
+        operation: add
+        value: 128
+  
+  # High motor count
+  - condition: "motor_count == '8+'"
+    description: "High motor count requires more timers"
+    actions:
+      - type: update_constraint
+        subsystem: motor_control
+        field: motor_count
+        operation: set
+        value: 8
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.pwm_timers
+        operation: set
+        value: 16
+  
+  # GPS sensor
+  - condition: "'GPS' in sensor_suite"
+    description: "GPS requires UART interface"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: gps_required
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: add
+        value: 1
+  
+  # LiDAR sensor
+  - condition: "'LiDAR' in sensor_suite"
+    description: "LiDAR requires high-speed serial or Ethernet"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: lidar_required
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: add
+        value: 1
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 64
+  
+  # Camera
+  - condition: "'Camera' in sensor_suite"
+    description: "Camera requires high-speed interface"
+    actions:
+      - type: update_constraint
+        subsystem: sensing
+        field: camera_required
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 200
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 128
+  
+  # Ethernet communication
+  - condition: "communication_protocol == 'Ethernet'"
+    description: "Ethernet for high-bandwidth communication"
+    actions:
+      - type: update_constraint
+        subsystem: communication
+        field: protocol
+        operation: set
+        value: "ethernet"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.ethernet
+        operation: set
+        value: 1
+  
+  # WiFi communication
+  - condition: "communication_protocol == 'WiFi'"
+    description: "WiFi requires external module"
+    actions:
+      - type: update_constraint
+        subsystem: communication
+        field: protocol
+        operation: set
+        value: "wifi"
+      - type: update_constraint
+        subsystem: communication
+        field: wireless
+        operation: set
+        value: true
+  
+  # Enhanced safety
+  - condition: "safety_features in ['Enhanced (Collision Detection)', 'Certified (ISO 13849)']"
+    description: "Enhanced safety requires redundant systems"
+    actions:
+      - type: add_subsystem
+        subsystem: safety
+        value:
+          required_functions: ["emergency_stop", "collision_detection"]
+          baseline_constraints:
+            redundant_sensors: true
+            safety_rated: true
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - robotics
+  - motor_control
+  - sensor_fusion
+  - real_time
+  - multi_axis
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Mobile robots"
+  - "Robotic arms"
+  - "Drones and UAVs"
+  - "Collaborative robots"
+  - "Autonomous vehicles"
+
+example_products:
+  - "Pixhawk flight controller"
+  - "ODrive motor controller"
+  - "Raspberry Pi with motor HAT"
+  - "STM32-based robot controllers"
+
+references:
+  - "https://www.st.com/en/applications/robotics.html"
+  - "ROS (Robot Operating System)"
+  - "Application Note: Motor Control for Robotics"

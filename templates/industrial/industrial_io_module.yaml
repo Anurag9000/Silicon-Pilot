@@ -1,0 +1,271 @@
+# Industrial I/O Module Template
+# Modbus/RS485 industrial I/O controller
+
+id: industrial_io_module_v1
+version: "1.0"
+device_type: industrial_controller
+name: "Industrial I/O Module"
+description: "Industrial I/O module with Modbus RTU/TCP, 4-20mA inputs, relay outputs, and DIN rail mounting"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - modbus_protocol
+      - io_scanning
+      - data_logging
+    baseline_constraints:
+      core_arch: ["cortex-m3", "cortex-m4"]
+      min_mhz: 72
+      min_flash_kb: 128
+      min_sram_kb: 32
+      peripherals:
+        uart: 2
+        adc_channels: 8
+        dac_channels: 2
+        gpio: 16
+        ethernet: 0
+      has_rtc: true
+    notes: "Industrial-grade MCU with sufficient I/O"
+  
+  power:
+    required_functions:
+      - wide_input_regulation
+    baseline_constraints:
+      input_voltage_range: [9, 36]
+      output_voltage: 3.3
+      output_current_ma: 500
+      isolation: true
+    notes: "Wide input voltage for industrial power supplies"
+  
+  communication:
+    required_functions:
+      - industrial_protocol
+    baseline_constraints:
+      protocol: "modbus_rtu"
+      interface: "rs485"
+      isolation: true
+    notes: "RS485 with galvanic isolation"
+  
+  analog_input:
+    required_functions:
+      - current_loop_input
+    baseline_constraints:
+      input_type: "4-20ma"
+      channel_count: 4
+      resolution_bits: 16
+      isolation: true
+    notes: "4-20mA current loop inputs"
+  
+  digital_output:
+    required_functions:
+      - relay_control
+    baseline_constraints:
+      output_type: "relay"
+      channel_count: 4
+      max_voltage: 250
+      max_current_a: 5
+    notes: "Relay outputs for switching loads"
+  
+  protection:
+    required_functions:
+      - overvoltage_protection
+      - esd_protection
+    baseline_constraints:
+      tvs_diodes: true
+      fuses: true
+    notes: "Industrial-grade protection"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - uart
+  - rs485
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: protocol_type
+    text: "Communication protocol?"
+    type: choice
+    choices: ["Modbus RTU (RS485)", "Modbus TCP (Ethernet)", "Profibus", "EtherCAT"]
+    priority: high
+    help_text: "Industrial communication protocol"
+  
+  - id: analog_input_count
+    text: "Number of analog inputs (4-20mA)?"
+    type: choice
+    choices: ["4", "8", "16"]
+    default: "4"
+    priority: high
+  
+  - id: digital_input_count
+    text: "Number of digital inputs?"
+    type: choice
+    choices: ["0", "4", "8", "16"]
+    default: "4"
+    priority: high
+  
+  - id: relay_output_count
+    text: "Number of relay outputs?"
+    type: choice
+    choices: ["0", "4", "8", "16"]
+    default: "4"
+    priority: high
+  
+  - id: analog_output_required
+    text: "Analog outputs (4-20mA) required?"
+    type: boolean
+    default: false
+    priority: medium
+  
+  - id: temperature_grade
+    text: "Operating temperature range?"
+    type: choice
+    choices: ["Commercial (0 to 70°C)", "Industrial (-40 to 85°C)", "Extended (-40 to 105°C)"]
+    default: "Industrial (-40 to 85°C)"
+    priority: high
+  
+  - id: conformal_coating
+    text: "Conformal coating required?"
+    type: boolean
+    default: false
+    priority: low
+    help_text: "For harsh environments"
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # Modbus TCP (Ethernet)
+  - condition: "protocol_type == 'Modbus TCP (Ethernet)'"
+    description: "Modbus TCP requires Ethernet"
+    actions:
+      - type: update_constraint
+        subsystem: communication
+        field: protocol
+        operation: set
+        value: "modbus_tcp"
+      - type: update_constraint
+        subsystem: communication
+        field: interface
+        operation: set
+        value: "ethernet"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.ethernet
+        operation: set
+        value: 1
+  
+  # High analog input count
+  - condition: "analog_input_count in ['8', '16']"
+    description: "More analog inputs require ADC multiplexing"
+    actions:
+      - type: update_constraint
+        subsystem: analog_input
+        field: channel_count
+        operation: set
+        value: 8
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.adc_channels
+        operation: set
+        value: 16
+  
+  # Digital inputs
+  - condition: "digital_input_count != '0'"
+    description: "Digital inputs require GPIO and optoisolation"
+    actions:
+      - type: add_subsystem
+        subsystem: digital_input
+        value:
+          required_functions: ["digital_sensing"]
+          baseline_constraints:
+            input_type: "24v_digital"
+            channel_count: 4
+            isolation: true
+  
+  # High relay count
+  - condition: "relay_output_count in ['8', '16']"
+    description: "More relays require additional drivers"
+    actions:
+      - type: update_constraint
+        subsystem: digital_output
+        field: channel_count
+        operation: set
+        value: 8
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.gpio
+        operation: add
+        value: 8
+  
+  # Analog outputs
+  - condition: "analog_output_required == True"
+    description: "Analog outputs require DAC"
+    actions:
+      - type: add_subsystem
+        subsystem: analog_output
+        value:
+          required_functions: ["current_loop_output"]
+          baseline_constraints:
+            output_type: "4-20ma"
+            channel_count: 2
+            resolution_bits: 16
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.dac_channels
+        operation: set
+        value: 4
+  
+  # Extended temperature
+  - condition: "temperature_grade == 'Extended (-40 to 105°C)'"
+    description: "Extended temperature requires industrial-grade components"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: temp_grade
+        operation: set
+        value: "extended"
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - industrial
+  - modbus
+  - rs485
+  - io_module
+  - din_rail
+  - 4-20ma
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Factory automation"
+  - "Process control"
+  - "Building automation"
+  - "SCADA systems"
+  - "Industrial monitoring"
+
+example_products:
+  - "Advantech ADAM modules"
+  - "Phoenix Contact I/O modules"
+  - "Wago I/O System"
+  - "Beckhoff EtherCAT I/O"
+
+references:
+  - "https://www.advantech.com/products/adam-modules"
+  - "Modbus Protocol Specification"
+  - "Application Note: 4-20mA Current Loop Design"

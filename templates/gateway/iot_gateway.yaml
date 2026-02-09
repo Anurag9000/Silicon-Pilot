@@ -1,0 +1,330 @@
+# IoT Gateway Template
+# Multi-protocol gateway for IoT networks
+
+id: iot_gateway_v1
+version: "1.0"
+device_type: gateway
+name: "IoT Gateway"
+description: "Multi-protocol IoT gateway with WiFi/Ethernet uplink and BLE/Zigbee/LoRa local connectivity"
+
+# ============================================================================
+# Subsystems
+# ============================================================================
+
+subsystems:
+  compute:
+    required_functions:
+      - protocol_translation
+      - data_buffering
+      - edge_processing
+    baseline_constraints:
+      core_arch: ["cortex-m4", "cortex-m7"]
+      min_mhz: 120
+      min_flash_kb: 512
+      min_sram_kb: 128
+      peripherals:
+        uart: 2
+        spi: 2
+        i2c: 1
+        ethernet: 1
+        usb_fs: 1
+      has_crypto: true
+    notes: "MCU with networking peripherals and crypto acceleration"
+  
+  power:
+    required_functions:
+      - buck_conversion
+      - linear_regulation
+    baseline_constraints:
+      input_voltage_range: [5, 12]
+      output_voltage: 3.3
+      output_current_ma: 1000
+    notes: "Power supply for MCU and wireless modules"
+  
+  uplink_communication:
+    required_functions:
+      - internet_connectivity
+    baseline_constraints:
+      uplink_type: "ethernet"
+      fallback_uplink: null
+    notes: "Primary internet connection"
+  
+  local_communication:
+    required_functions:
+      - local_network
+    baseline_constraints:
+      protocols: []
+    notes: "Local IoT device connectivity"
+  
+  storage:
+    required_functions:
+      - data_buffering
+    baseline_constraints:
+      storage_type: "flash"
+      capacity_mb_min: 8
+      interface: "spi"
+    optional: true
+    notes: "Optional external flash for data buffering"
+
+# ============================================================================
+# Required Interfaces
+# ============================================================================
+
+required_interfaces:
+  - ethernet
+  - uart
+  - spi
+
+# ============================================================================
+# Questions
+# ============================================================================
+
+questions:
+  - id: uplink_type
+    text: "Primary uplink connectivity?"
+    type: choice
+    choices: ["Ethernet", "WiFi", "Cellular (4G/LTE)", "Dual (Ethernet + WiFi)"]
+    priority: high
+    help_text: "How gateway connects to internet"
+  
+  - id: local_protocols
+    text: "Local IoT protocols? (select all that apply)"
+    type: choice
+    choices: ["BLE", "Zigbee", "LoRa", "Thread", "Z-Wave", "Modbus RTU", "RS485"]
+    priority: high
+    help_text: "Protocols for connecting local IoT devices"
+  
+  - id: device_count
+    text: "Expected number of connected devices?"
+    type: choice
+    choices: ["1-10", "10-50", "50-100", "100+"]
+    priority: high
+    help_text: "Determines memory and processing requirements"
+  
+  - id: edge_processing
+    text: "Edge processing/analytics required?"
+    type: boolean
+    default: false
+    priority: medium
+    help_text: "Local data processing before cloud upload"
+  
+  - id: security_level
+    text: "Security requirements?"
+    type: choice
+    choices: ["Basic", "Enhanced (TLS/DTLS)", "High (Secure Element)"]
+    default: "Enhanced (TLS/DTLS)"
+    priority: medium
+  
+  - id: power_source
+    text: "Power source?"
+    type: choice
+    choices: ["Wall Adapter (5V)", "PoE", "12V DC", "Battery Backup"]
+    default: "Wall Adapter (5V)"
+    priority: medium
+  
+  - id: enclosure_type
+    text: "Enclosure type?"
+    type: choice
+    choices: ["Desktop", "DIN Rail", "Wall Mount", "Outdoor (IP65)"]
+    default: "Desktop"
+    priority: low
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rules:
+  # WiFi uplink
+  - condition: "uplink_type in ['WiFi', 'Dual (Ethernet + WiFi)']"
+    description: "WiFi requires ESP32 or WiFi module"
+    actions:
+      - type: update_constraint
+        subsystem: uplink_communication
+        field: uplink_type
+        operation: set
+        value: "wifi"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: set
+        value: 3
+      - type: update_constraint
+        subsystem: power
+        field: output_current_ma
+        operation: set
+        value: 1500
+  
+  # Cellular uplink
+  - condition: "uplink_type == 'Cellular (4G/LTE)'"
+    description: "Cellular requires modem module"
+    actions:
+      - type: update_constraint
+        subsystem: uplink_communication
+        field: uplink_type
+        operation: set
+        value: "cellular"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: set
+        value: 3
+      - type: update_constraint
+        subsystem: power
+        field: output_current_ma
+        operation: set
+        value: 2000
+  
+  # BLE local protocol
+  - condition: "'BLE' in local_protocols"
+    description: "BLE requires UART interface"
+    actions:
+      - type: update_constraint
+        subsystem: local_communication
+        field: protocols
+        operation: append
+        value: "ble"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: add
+        value: 1
+  
+  # Zigbee local protocol
+  - condition: "'Zigbee' in local_protocols"
+    description: "Zigbee requires SPI interface"
+    actions:
+      - type: update_constraint
+        subsystem: local_communication
+        field: protocols
+        operation: append
+        value: "zigbee"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.spi
+        operation: add
+        value: 1
+  
+  # LoRa local protocol
+  - condition: "'LoRa' in local_protocols"
+    description: "LoRa requires SPI interface"
+    actions:
+      - type: update_constraint
+        subsystem: local_communication
+        field: protocols
+        operation: append
+        value: "lora"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.spi
+        operation: add
+        value: 1
+  
+  # Modbus/RS485
+  - condition: "'Modbus RTU' in local_protocols or 'RS485' in local_protocols"
+    description: "Modbus/RS485 requires UART + transceiver"
+    actions:
+      - type: update_constraint
+        subsystem: local_communication
+        field: protocols
+        operation: append
+        value: "modbus_rtu"
+      - type: update_constraint
+        subsystem: compute
+        field: peripherals.uart
+        operation: add
+        value: 1
+  
+  # High device count
+  - condition: "device_count in ['50-100', '100+']"
+    description: "High device count requires more memory"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: set
+        value: 256
+      - type: update_constraint
+        subsystem: compute
+        field: min_flash_kb
+        operation: set
+        value: 1024
+  
+  # Edge processing
+  - condition: "edge_processing == True"
+    description: "Edge processing requires faster CPU and more memory"
+    actions:
+      - type: update_constraint
+        subsystem: compute
+        field: min_mhz
+        operation: set
+        value: 200
+      - type: update_constraint
+        subsystem: compute
+        field: min_sram_kb
+        operation: add
+        value: 128
+      - type: update_constraint
+        subsystem: storage
+        field: optional
+        operation: set
+        value: false
+  
+  # High security
+  - condition: "security_level == 'High (Secure Element)'"
+    description: "High security requires secure element"
+    actions:
+      - type: add_subsystem
+        subsystem: security
+        value:
+          required_functions: ["secure_storage", "crypto_acceleration"]
+          baseline_constraints:
+            secure_element: true
+            interface: "i2c"
+  
+  # PoE power
+  - condition: "power_source == 'PoE'"
+    description: "PoE requires PoE module"
+    actions:
+      - type: update_constraint
+        subsystem: power
+        field: poe_required
+        operation: set
+        value: true
+      - type: update_constraint
+        subsystem: power
+        field: input_voltage_range
+        operation: set
+        value: [37, 57]
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+tags:
+  - gateway
+  - iot
+  - multi_protocol
+  - networking
+  - edge_computing
+
+author: "HardwareGenius Team"
+created_at: "2026-02-09"
+updated_at: "2026-02-09"
+
+use_cases:
+  - "Smart building automation"
+  - "Industrial IoT gateway"
+  - "Home automation hub"
+  - "Agricultural monitoring"
+  - "Smart city infrastructure"
+
+example_products:
+  - "Raspberry Pi with add-on modules"
+  - "MultiTech Conduit"
+  - "Cisco IoT Gateway"
+  - "Dell Edge Gateway"
+
+references:
+  - "https://www.cisco.com/c/en/us/solutions/internet-of-things/iot-gateways.html"
+  - "Application Note: IoT Gateway Design"
+  - "MQTT Protocol Specification"
