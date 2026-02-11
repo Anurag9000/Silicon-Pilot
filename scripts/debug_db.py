@@ -67,6 +67,9 @@ def debug_db():
         
         cur.execute("SELECT COUNT(*) FROM dcdc_specs")
         print(f"DC-DC Specs: {cur.fetchone()[0]}")
+        
+        cur.execute("SELECT COUNT(*) FROM part_pricing")
+        print(f"Pricing Rows: {cur.fetchone()[0]}")
 
 
         conn.close()
