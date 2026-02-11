@@ -8,6 +8,7 @@ Simple FastAPI + HTML/JavaScript frontend for:
 - Export functionality
 """
 
+from __future__ import annotations
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +23,7 @@ from templates.template_system import TemplateLoader
 from llm.intent_classifier import IntentParser, TemplateMatcher
 from architecture.compiler import ArchitectureBuilder, ConstraintCompiler
 from architecture.enhanced_exports import ExportManager
+from core.models import RequirementSpec
 
 
 # ============================================================================
@@ -586,7 +588,7 @@ INDEX_HTML = """
 if __name__ == "__main__":
     templates_dir = Path(__file__).parent / "templates"
     templates_dir.mkdir(exist_ok=True)
-    (templates_dir / "index.html").write_text(INDEX_HTML)
+    (templates_dir / "index.html").write_text(INDEX_HTML, encoding="utf-8")
     
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

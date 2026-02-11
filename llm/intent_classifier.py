@@ -9,7 +9,7 @@ Uses LLM to parse user natural language and extract:
 
 The LLM is used ONLY for classification, NOT for design decisions.
 """
-
+from __future__ import annotations
 import os
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field
@@ -49,7 +49,7 @@ class TemplateMatch(BaseModel):
 # Intent Classifier
 # ============================================================================
 
-class IntentClassifier:
+class IntentParser:
     """
     Classifies user intent using LLM.
     
@@ -342,7 +342,7 @@ class IntentPipeline:
         api_key: Optional[str] = None,
         model: str = "gpt-4"
     ):
-        self.classifier = IntentClassifier(api_key=api_key, model=model)
+        self.classifier = IntentParser(api_key=api_key, model=model)
         self.matcher = TemplateMatcher(template_loader)
     
     def process(self, user_input: str, top_k: int = 5) -> tuple[ExtractedIntent, List[TemplateMatch]]:

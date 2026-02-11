@@ -5,7 +5,8 @@ Pydantic models for API contracts, validation, and internal data structures.
 These models enforce the "evidence-required" principle and deterministic behavior.
 """
 
-from pydantic import BaseModel, Field, validator
+from __future__ import annotations
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Dict, Optional, Any, Tuple
 from enum import Enum
 from datetime import datetime
@@ -141,6 +142,8 @@ class RequirementSpec(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
+RequirementSpec.model_rebuild()
+
 
 # ============================================================================
 # QUESTION & ANSWER
@@ -174,6 +177,8 @@ class QuestionBatch(BaseModel):
     turn_index: int
     questions: List[Question]
     stop_reason: Optional[str] = None  # "tier_1_complete", "top_n_stable", "user_skip"
+
+QuestionBatch.model_rebuild()
 
 
 # ============================================================================
@@ -308,6 +313,8 @@ class RecommendationResult(BaseModel):
     generated_at: datetime = Field(default_factory=datetime.utcnow)
     execution_time_ms: Optional[float] = None
 
+RecommendationResult.model_rebuild()
+
 
 # ============================================================================
 # CONFLICT RESOLUTION
@@ -379,6 +386,8 @@ class DesignTemplate(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
+DesignTemplate.model_rebuild()
+
 
 # ============================================================================
 # API REQUEST/RESPONSE MODELS
@@ -392,8 +401,10 @@ class ParseRequirementsRequest(BaseModel):
 
 class ParseRequirementsResponse(BaseModel):
     """Response with parsed spec and initial questions"""
-    spec: RequirementSpec
+    spec: "RequirementSpec"
     questions: Optional[QuestionBatch] = None
+
+ParseRequirementsResponse.model_rebuild()
 
 
 class AnswerQuestionsRequest(BaseModel):
@@ -404,9 +415,11 @@ class AnswerQuestionsRequest(BaseModel):
 
 class AnswerQuestionsResponse(BaseModel):
     """Response with updated spec and next questions"""
-    spec: RequirementSpec
+    spec: "RequirementSpec"
     questions: Optional[QuestionBatch] = None
     ready_for_recommendation: bool
+
+AnswerQuestionsResponse.model_rebuild()
 
 
 class RecommendRequest(BaseModel):
@@ -417,9 +430,8 @@ class RecommendRequest(BaseModel):
 
 
 # ============================================================================
-# VALIDATION HELPERS
+# MODEL REBUILD (For Pydantic V2 circular/delayed types)
 # ============================================================================
 
-# Note: Field validators are already defined inline using Pydantic's Field() constraints
-# (e.g., Field(ge=0.0, le=1.0) for confidence fields)
+
 

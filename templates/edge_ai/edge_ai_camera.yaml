@@ -3,7 +3,7 @@
 
 id: edge_ai_camera_v1
 version: "1.0"
-device_type: edge_ai
+device_type: edge_ai_camera
 name: "Edge AI Camera"
 description: "Edge AI camera system with computer vision, object detection, and local inference"
 

@@ -95,9 +95,9 @@ class HardFilter:
         ORDER BY p.mpn ASC  -- Deterministic ordering for tie-breaking
         """
         
-        # Execute query
+        # Execute query with positional parameters
         async with self.db_pool.acquire() as conn:
-            rows = await conn.fetch(query, **params)
+            rows = await conn.fetch(query, *params)
         
         logger.info(f"Hard filter: {len(rows)} candidates found")
         

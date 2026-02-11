@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- Core part information (manufacturer, family, status, package, temp range)
 -- ============================================================================
 CREATE TABLE parts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     mpn VARCHAR(100) NOT NULL UNIQUE,
     manufacturer VARCHAR(100) NOT NULL,
     family VARCHAR(100),
@@ -19,6 +19,7 @@ CREATE TABLE parts (
     pin_count INTEGER,
     temp_min_c INTEGER,
     temp_max_c INTEGER,
+    datasheet_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -35,7 +36,7 @@ CREATE INDEX idx_parts_composite ON parts(manufacturer, status, package_family);
 -- Typed queryable fields for MCU specifications
 -- ============================================================================
 CREATE TABLE mcu_specs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
     -- Core specifications
@@ -97,7 +98,7 @@ CREATE INDEX idx_mcu_specs_composite ON mcu_specs(core, flash_kb, sram_kb);
 -- Source tracking with hash, version, fetch timestamp
 -- ============================================================================
 CREATE TABLE documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     source_url TEXT NOT NULL,
     source_type VARCHAR(50) NOT NULL, -- mfg_pdf, mfg_html, dist_html, other
     doc_hash VARCHAR(64) NOT NULL, -- SHA-256
@@ -119,7 +120,7 @@ CREATE INDEX idx_documents_type ON documents(source_type);
 -- Provenance tracking for every extracted field
 -- ============================================================================
 CREATE TABLE evidence (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
     field_path VARCHAR(200) NOT NULL, -- e.g., "mcu_specs.flash_kb"
     
@@ -151,7 +152,7 @@ CREATE INDEX idx_evidence_confidence ON evidence(confidence);
 -- Cross-source validation and resolution workflow
 -- ============================================================================
 CREATE TABLE conflicts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
     field_path VARCHAR(200) NOT NULL,
     evidence_ids UUID[] NOT NULL, -- Array of conflicting evidence IDs
@@ -170,7 +171,7 @@ CREATE INDEX idx_conflicts_status ON conflicts(status);
 -- Store user specs with uncertainty tracking
 -- ============================================================================
 CREATE TABLE requirement_specs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     spec JSONB NOT NULL, -- Full RequirementSpec object
     source_text TEXT,
     mode VARCHAR(50), -- constraint, intent
@@ -185,7 +186,7 @@ CREATE INDEX idx_requirement_specs_mode ON requirement_specs(mode);
 -- Conversation history for question-answer flow
 -- ============================================================================
 CREATE TABLE question_turns (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     spec_id UUID NOT NULL REFERENCES requirement_specs(id) ON DELETE CASCADE,
     turn_index INTEGER NOT NULL,
     questions JSONB NOT NULL, -- Array of Question objects
@@ -201,7 +202,7 @@ CREATE INDEX idx_question_turns_turn ON question_turns(spec_id, turn_index);
 -- Audit trail with explanations
 -- ============================================================================
 CREATE TABLE recommendation_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     spec_id UUID NOT NULL REFERENCES requirement_specs(id) ON DELETE CASCADE,
     candidates JSONB NOT NULL, -- Array of {mpn, score, score_breakdown}
     explanations JSONB, -- Constraint checks, ranking reasons
@@ -216,7 +217,7 @@ CREATE INDEX idx_recommendation_logs_spec ON recommendation_logs(spec_id);
 -- Track ingestion pipeline runs
 -- ============================================================================
 CREATE TABLE extraction_runs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     parser_version VARCHAR(50) NOT NULL,
     status VARCHAR(50) NOT NULL, -- success, partial, failed
@@ -233,7 +234,7 @@ CREATE INDEX idx_extraction_runs_status ON extraction_runs(status);
 -- TEMPLATES TABLE (for v2: intent → architecture)
 -- ============================================================================
 CREATE TABLE templates (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL UNIQUE,
     description TEXT,
     subsystems JSONB NOT NULL, -- Array of subsystem definitions

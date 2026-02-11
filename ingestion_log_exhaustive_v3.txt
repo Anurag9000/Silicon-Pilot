@@ -1,0 +1,42 @@
+C:\Users\DELL\AppData\Local\Programs\Python\Python310\lib\site-packages\pypdf\_crypt_providers\_cryptography.py:32: CryptographyDeprecationWarning: ARC4 has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.ARC4 and will be removed from cryptography.hazmat.primitives.ciphers.algorithms in 48.0.0.
+  from cryptography.hazmat.primitives.ciphers.algorithms import AES, ARC4
+DATABASE_URL not set. Falling back to mock database.
+[OK] Database connected
+
+============================================================
+STM32 COMPLETE INGESTION PIPELINE
+============================================================
+
+STEP 1: Downloading STM32 Datasheets
+------------------------------------------------------------
+
+============================================================
+Downloading STM32F0 datasheets (3 files)
+============================================================
+Traceback (most recent call last):
+  File "D:\Done,Toreview\HardwareGenius\ingestion\stm32_downloader.py", line 150, in download_family
+    print(f"\u2b07 Downloading: {filename}...", end=" ", flush=True)
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u2b07' in position 0: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Done,Toreview\HardwareGenius\ingestion\run_stm32_ingestion.py", line 247, in <module>
+    asyncio.run(main())
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python310\lib\asyncio\runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python310\lib\asyncio\base_events.py", line 649, in run_until_complete
+    return future.result()
+  File "D:\Done,Toreview\HardwareGenius\ingestion\run_stm32_ingestion.py", line 241, in main
+    await ingester.ingest_all()
+  File "D:\Done,Toreview\HardwareGenius\ingestion\run_stm32_ingestion.py", line 49, in ingest_all
+    download_results = self.downloader.download_all()
+  File "D:\Done,Toreview\HardwareGenius\ingestion\stm32_downloader.py", line 180, in download_all
+    results[family] = self.download_family(family)
+  File "D:\Done,Toreview\HardwareGenius\ingestion\stm32_downloader.py", line 166, in download_family
+    print(f"\u26a0 Failed to download {filename}: {e}")
+  File "C:\Users\DELL\AppData\Local\Programs\Python\Python310\lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+UnicodeEncodeError: 'charmap' codec can't encode character '\u26a0' in position 0: character maps to <undefined>

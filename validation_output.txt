@@ -1,0 +1,14 @@
+Scanning templates...
+[audio_device.yaml] device_type: 'audio_device' (type: str)
+[environmental_data_logger.yaml] device_type: 'data_logger' (type: str)
+[display_controller.yaml] device_type: 'display_controller' (type: str)
+[edge_ai_camera.yaml] device_type: 'edge_ai' (type: str)
+  FAILED: 'edge_ai' is not a valid DeviceType!
+[iot_gateway.yaml] device_type: 'gateway' (type: str)
+[industrial_io_module.yaml] device_type: 'industrial_controller' (type: str)
+[can_motor_controller.yaml] device_type: 'motor_controller' (type: str)
+[battery_charger.yaml] device_type: 'power_supply' (type: str)
+[robotics_controller.yaml] device_type: 'robotics_controller' (type: str)
+[iot_sensor_node.yaml] device_type: 'sensor_node' (type: str)
+[smart_appliance_controller.yaml] device_type: 'smart_appliance' (type: str)
+[wearable_device.yaml] device_type: 'wearable' (type: str)

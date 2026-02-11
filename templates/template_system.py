@@ -5,10 +5,11 @@ Loads, validates, and manages device templates for architecture synthesis.
 Templates are YAML files containing curated engineering knowledge.
 """
 
+from __future__ import annotations
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 import yaml
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 from core.ontology import (
@@ -41,18 +42,21 @@ class TemplateQuestion(BaseModel):
     """A question to ask the user during template instantiation"""
     id: str
     text: str
-    type: QuestionType
-    priority: QuestionPriority = QuestionPriority.MEDIUM
+    type: "QuestionType"
+    priority: "QuestionPriority" = QuestionPriority.MEDIUM
     choices: Optional[List[str]] = None
     default: Optional[Any] = None
     help_text: Optional[str] = None
     
-    @validator('choices')
-    def validate_choices(cls, v, values):
-        if values.get('type') == QuestionType.CHOICE and not v:
+    @field_validator('choices')
+    @classmethod
+    def validate_choices(cls, v, info):
+        if info.data.get('type') == QuestionType.CHOICE and not v:
             raise ValueError("CHOICE questions must have choices")
         return v
 
+
+TemplateQuestion.model_rebuild()
 
 class RuleAction(BaseModel):
     """An action to execute when a rule condition is met"""
@@ -62,13 +66,18 @@ class RuleAction(BaseModel):
     operation: Optional[str] = None  # add, multiply, set, etc.
     value: Optional[Any] = None
 
+TemplateQuestion.model_rebuild()
+RuleAction.model_rebuild()
+
 
 class TemplateRule(BaseModel):
     """Conditional rule that modifies the architecture based on answers"""
     condition: str  # Python expression, e.g., "motor_type == 'BLDC'"
-    actions: List[RuleAction]
+    actions: List["RuleAction"]
     description: Optional[str] = None
 
+
+TemplateRule.model_rebuild()
 
 class SubsystemTemplate(BaseModel):
     """Template for a subsystem within a device"""
@@ -77,6 +86,8 @@ class SubsystemTemplate(BaseModel):
     optional: bool = False
     notes: Optional[str] = None
 
+SubsystemTemplate.model_rebuild()
+
 
 class DeviceTemplate(BaseModel):
     """Complete device template"""
@@ -84,15 +95,26 @@ class DeviceTemplate(BaseModel):
     version: str = "1.0"
     device_type: DeviceType
     name: str
+    
+    @field_validator('device_type', mode='before')
+    @classmethod
+    def validate_device_type(cls, v):
+        if isinstance(v, str):
+            try:
+                return DeviceType(v.lower())
+            except ValueError:
+                return v
+        return v
+    
     description: str
     
     # Architecture
-    subsystems: Dict[str, SubsystemTemplate]
+    subsystems: Dict[str, "SubsystemTemplate"]
     required_interfaces: List[str] = Field(default_factory=list)
     
     # User interaction
-    questions: List[TemplateQuestion] = Field(default_factory=list)
-    rules: List[TemplateRule] = Field(default_factory=list)
+    questions: List["TemplateQuestion"] = Field(default_factory=list)
+    rules: List["TemplateRule"] = Field(default_factory=list)
     
     # Metadata
     tags: List[str] = Field(default_factory=list)
@@ -105,6 +127,9 @@ class DeviceTemplate(BaseModel):
     example_products: List[str] = Field(default_factory=list)
     references: List[str] = Field(default_factory=list)
 
+TemplateRule.model_rebuild()
+DeviceTemplate.model_rebuild()
+
 
 # ============================================================================
 # Template Loader
@@ -114,7 +139,7 @@ class TemplateLoader:
     """Loads and validates device templates from YAML files"""
     
     def __init__(self, template_dir: Path = Path("templates")):
-        self.template_dir = template_dir
+        self.template_dir = Path(template_dir)
         self.templates: Dict[str, DeviceTemplate] = {}
         self._load_all_templates()
     
@@ -129,7 +154,10 @@ class TemplateLoader:
                 template = self.load_template(yaml_file)
                 self.templates[template.id] = template
             except Exception as e:
-                print(f"Warning: Failed to load template {yaml_file}: {e}")
+                try:
+                    print(f"Warning: Failed to load template {yaml_file}: {e}")
+                except UnicodeEncodeError:
+                    print(f"Warning: Failed to load template {yaml_file.name}: [Unicode Error]")
     
     def load_template(self, template_path: Path) -> DeviceTemplate:
         """Load a single template from a YAML file"""

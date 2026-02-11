@@ -1,11 +1,5 @@
-"""
-Architecture Graph Builder and Constraint Compiler
-
-Builds architecture graphs from templates and compiles them into RequirementSpec
-for the deterministic solver.
-"""
-
-from typing import Dict, List, Optional, Any, Set
+from __future__ import annotations
+import logging
 from pydantic import BaseModel, Field
 from copy import deepcopy
 
@@ -175,7 +169,7 @@ class ConstraintCompiler:
         graph: ArchitectureGraph,
         user_requirements: Optional[Dict[str, Any]] = None,
         template_context: Optional[Dict[str, Any]] = None
-    ) -> RequirementSpec:
+    ) -> "RequirementSpec":
         """
         Compile architecture graph into requirement spec.
         
@@ -227,10 +221,10 @@ class ConstraintCompiler:
     
     def _apply_intelligent_optimization(
         self,
-        spec: RequirementSpec,
+        spec: "RequirementSpec",
         user_requirements: Dict[str, Any],
         template_context: Dict[str, Any]
-    ) -> RequirementSpec:
+    ) -> "RequirementSpec":
         """Apply intelligent constraint optimization"""
         
         # Convert spec to dict for optimization
@@ -287,7 +281,7 @@ class ConstraintCompiler:
         
         return spec
     
-    def _compile_compute_constraints(self, subsystem: Subsystem, spec: RequirementSpec):
+    def _compile_compute_constraints(self, subsystem: Subsystem, spec: "RequirementSpec"):
         """Compile compute subsystem constraints"""
         constraints = subsystem.baseline_constraints
         
@@ -320,7 +314,7 @@ class ConstraintCompiler:
         if 'power_profile' in constraints:
             spec.power_profile = constraints['power_profile']
     
-    def _compile_power_constraints(self, subsystem: Subsystem, spec: RequirementSpec):
+    def _compile_power_constraints(self, subsystem: Subsystem, spec: "RequirementSpec"):
         """Compile power subsystem constraints"""
         constraints = subsystem.baseline_constraints
         
@@ -332,25 +326,25 @@ class ConstraintCompiler:
         if 'battery_powered' in constraints:
             spec.battery_powered = constraints['battery_powered']
     
-    def _compile_communication_constraints(self, subsystem: Subsystem, spec: RequirementSpec):
+    def _compile_communication_constraints(self, subsystem: Subsystem, spec: "RequirementSpec"):
         """Compile communication subsystem constraints"""
         constraints = subsystem.baseline_constraints
         
         if 'wireless_protocol' in constraints:
             spec.wireless_protocol = constraints['wireless_protocol']
     
-    def _compile_environmental_constraints(self, env: EnvironmentalRequirements, spec: RequirementSpec):
+    def _compile_environmental_constraints(self, env: EnvironmentalRequirements, spec: "RequirementSpec"):
         """Compile environmental requirements"""
         spec.temp_min = env.temp_min_c
         spec.temp_max = env.temp_max_c
         spec.environment_type = env.environment_type.value
     
-    def _compile_performance_constraints(self, perf: PerformanceRequirements, spec: RequirementSpec):
+    def _compile_performance_constraints(self, perf: PerformanceRequirements, spec: "RequirementSpec"):
         """Compile performance requirements"""
         spec.power_profile = perf.power_profile.value
         spec.performance_class = perf.performance_class.value
     
-    def _compile_interface_constraints(self, interfaces: List[Interface], spec: RequirementSpec):
+    def _compile_interface_constraints(self, interfaces: List[Interface], spec: "RequirementSpec"):
         """Compile interface requirements into peripheral constraints"""
         if not hasattr(spec, 'peripherals_min'):
             spec.peripherals_min = {}
@@ -405,7 +399,7 @@ def build_architecture_from_template(
     return builder.apply_rules()
 
 
-def compile_architecture_to_spec(graph: ArchitectureGraph) -> RequirementSpec:
+def compile_architecture_to_spec(graph: ArchitectureGraph) -> "RequirementSpec":
     """
     Compile architecture graph to requirement spec.
     

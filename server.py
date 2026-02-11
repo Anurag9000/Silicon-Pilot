@@ -12,7 +12,10 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse
 import asyncpg
+from pathlib import Path
 
 from core import (
     Database,
@@ -47,6 +50,9 @@ near_miss_engine: Optional[NearMissEngine] = None
 llm_orchestrator: Optional[LLMOrchestrator] = None
 question_engine: Optional[QuestionEngine] = None
 
+# Background tasks
+from fastapi import BackgroundTasks
+import subprocess
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,7 +60,7 @@ async def lifespan(app: FastAPI):
     global db_ops, hard_filter, ranking_engine, near_miss_engine, llm_orchestrator, question_engine
     
     # Startup
-    logger.info("Starting Silicon-Pilot API")
+    logger.info("Starting HardwareGenius Unified Server")
     
     # Connect to database
     await db.connect()
@@ -81,8 +87,8 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="HardwareGenius API",
-    description="Evidence-backed, deterministic hardware component recommendation system",
-    version="1.0.0",
+    description="Evidence-backed, deterministic hardware component recommendation system (Unified)",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -95,6 +101,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount Frontend Static Files
+# This unifies the frontend serving into the main API server
+static_dir = Path(__file__).parent / "web_ui" / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# ==================== Frontend Routes ====================
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    """Serve the main frontend application"""
+    index_path = Path(__file__).parent / "web_ui" / "templates" / "index.html"
+    if index_path.exists():
+        return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>Frontend not found</h1>", status_code=404)
 
 # ==================== Health Check ====================
 
@@ -421,9 +442,64 @@ async def get_conflicts(limit: int = 100):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+# ==================== Ingestion Control ====================
+
+@app.post("/admin/ingest")
+async def trigger_ingestion(background_tasks: BackgroundTasks):
+    """Trigger the STM32 ingestion process in the background"""
+    def run_ingestion():
+        logger.info("Starting ingestion process...")
+        try:
+            # Run the ingestion script as a subprocess to avoid blocking the event loop
+            # and to handle the large memory usage of PDF processing
+            script_path = "ingestion/run_stm32_ingestion.py"
+            subprocess.run(["python", script_path], check=True)
+            logger.info("Ingestion process completed successfully")
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Ingestion process failed: {e}")
+        except Exception as e:
+            logger.error(f"Ingestion trigger error: {e}")
+
+    background_tasks.add_task(run_ingestion)
+    return {"status": "Ingestion triggered", "message": "Check server logs for progress"}
+
+
+# ==================== Evidence Content ====================
+
+@app.get("/evidence/{evidence_id}/content")
+async def get_evidence_content(evidence_id: UUID):
+    """Get the actual image content for an evidence record"""
+    try:
+        evidence = await db_ops.get_evidence_by_id(evidence_id)
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        
+        # In a real system, this would fetch from S3 or local storage
+        # using evidence.snippet_storage_key
+        # For MVP, we'll look for a local file if keys are paths
+        
+        # Placeholder: Return a generic image or fail gracefully if not implemented
+        # Check if we have a valid path in storage_key
+        key = evidence.get("snippet_storage_key")
+        if key and os.path.exists(key):
+             return FileResponse(key)
+        
+        # Fallback/Mock
+        return JSONResponse(
+            content={"message": "Evidence content not available in storage", "key": key},
+            status_code=404
+        )
+    
+    except Exception as e:
+        logger.error(f"Error serving evidence content: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     
+    # Serve on 8000
     uvicorn.run(
         "server:app",
         host="0.0.0.0",

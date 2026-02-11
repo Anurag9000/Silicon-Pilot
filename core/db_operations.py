@@ -4,6 +4,7 @@ Database Operations
 CRUD operations for all database entities with asyncpg.
 """
 
+from __future__ import annotations
 import logging
 from typing import Dict, List, Any, Optional
 from uuid import UUID

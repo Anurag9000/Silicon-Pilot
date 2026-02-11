@@ -67,7 +67,12 @@ class PDFParser:
             result['metadata'], result['pages'] = self._extract_pages(pdf_bytes)
             
             # Extract tables
-            result['tables'] = self._extract_tables(pdf_path)
+            # Identify relevant pages for table extraction
+            relevant_pages = self._identify_table_pages(result['pages'])
+            logger.info(f"Identified relevant pages for table extraction: {relevant_pages}")
+            
+            # Extract tables
+            result['tables'] = self._extract_tables(pdf_path, page_numbers=relevant_pages)
             
         finally:
             # Cleanup temp file if we created one
@@ -173,7 +178,47 @@ class PDFParser:
             logger.error(f"OCR failed: {e}")
             return ""
     
-    def _extract_tables(self, pdf_path: str) -> List[Dict]:
+    def _identify_table_pages(self, pages: List[Dict]) -> List[int]:
+        """
+        Identify pages that likely contain relevant tables based on keywords.
+        Always includes first 3 pages.
+        """
+        relevant_indices = set()
+        
+        # Keywords that suggest data tables
+        keywords = [
+            "electrical characteristics",
+            "specifications",
+            "absolute maximum ratings",
+            "recommended operating conditions",
+            "thermal information",
+            "pin configuration",
+            "pin functions",
+            "ordering information"
+        ]
+        
+        for i, page in enumerate(pages):
+            # Always include first 3 pages (summary, TOC, pinning)
+            if i < 3:
+                relevant_indices.add(i + 1)
+                continue
+                
+            text = page.get('text', '').lower()
+            
+            # Check for keywords
+            if any(k in text for k in keywords):
+                relevant_indices.add(i + 1)
+        
+        # Sort and limit to avoid processing too many pages
+        # If we found > 20 pages, something might be wrong (or it's a huge doc), cap it
+        result = sorted(list(relevant_indices))
+        if len(result) > 20:
+             logger.warning(f"Found {len(result)} relevant pages, capping at 20")
+             return result[:20]
+             
+        return result
+
+    def _extract_tables(self, pdf_path: str, page_numbers: List[int] = None) -> List[Dict]:
         """
         Extract tables using Camelot.
         
@@ -183,10 +228,17 @@ class PDFParser:
         tables = []
         
         try:
+            # Convert page numbers to string for Camelot (e.g., "1,3,5")
+            pages_arg = '1-end'
+            if page_numbers:
+                pages_arg = ','.join(map(str, page_numbers))
+            
+            logger.info(f"Extracting tables from pages: {pages_arg}")
+
             # Try lattice mode first (for bordered tables)
             lattice_tables = camelot.read_pdf(
                 pdf_path,
-                pages='all',
+                pages=pages_arg,
                 flavor='lattice',
                 suppress_stdout=True,
             )
@@ -204,7 +256,7 @@ class PDFParser:
             # Try stream mode for borderless tables
             stream_tables = camelot.read_pdf(
                 pdf_path,
-                pages='all',
+                pages=pages_arg,
                 flavor='stream',
                 suppress_stdout=True,
             )

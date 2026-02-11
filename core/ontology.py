@@ -5,6 +5,7 @@ Defines the formal vocabulary for device types, subsystems, functions,
 interfaces, and environmental contexts used in template-based architecture synthesis.
 """
 
+from __future__ import annotations
 from enum import Enum
 from typing import List, Dict, Optional, Set
 from pydantic import BaseModel, Field
@@ -26,6 +27,8 @@ class DeviceType(str, Enum):
     POWER_SUPPLY = "power_supply"
     DISPLAY_CONTROLLER = "display_controller"
     AUDIO_DEVICE = "audio_device"
+    EDGE_AI_CAMERA = "edge_ai_camera"
+    INDUSTRIAL_CONTROLLER = "industrial_controller"
 
 
 # ============================================================================
@@ -192,7 +195,7 @@ class Subsystem(BaseModel):
     """Represents a subsystem in the architecture"""
     type: SubsystemType
     required_functions: List[str] = Field(default_factory=list)
-    baseline_constraints: Dict[str, any] = Field(default_factory=dict)
+    baseline_constraints: Dict[str, Any] = Field(default_factory=dict)
     recommended_parts: List[str] = Field(default_factory=list)
     notes: Optional[str] = None
 
@@ -202,7 +205,7 @@ class Interface(BaseModel):
     type: InterfaceType
     required: bool = True
     count: int = 1
-    specifications: Dict[str, any] = Field(default_factory=dict)
+    specifications: Dict[str, Any] = Field(default_factory=dict)
 
 
 class EnvironmentalRequirements(BaseModel):
@@ -233,7 +236,7 @@ class ArchitectureGraph(BaseModel):
     interfaces: List[Interface] = Field(default_factory=list)
     environmental_requirements: Optional[EnvironmentalRequirements] = None
     performance_requirements: Optional[PerformanceRequirements] = None
-    additional_constraints: Dict[str, any] = Field(default_factory=dict)
+    additional_constraints: Dict[str, Any] = Field(default_factory=dict)
     
     def add_subsystem(self, name: str, subsystem: Subsystem):
         """Add a subsystem to the architecture"""

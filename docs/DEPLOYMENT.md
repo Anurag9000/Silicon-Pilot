@@ -1,188 +1,142 @@
-# HardwareGenius - Production Deployment Guide
+# HardwareGenius Deployment Guide
 
-**Version**: 1.0.0  
-**Status**: Production-Ready  
-**Date**: February 9, 2026
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.10+
-- PostgreSQL 14+
-- Redis (optional, for caching)
-- Node.js 18+ (for web UI)
-
-### Installation
-
-```bash
-# Clone repository
-git clone https://github.com/yourusername/HardwareGenius.git
-cd HardwareGenius
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Setup database
-python scripts/setup_database.py
-
-# Run migrations
-python ingestion/batch_ingestion.py
-
-# Start web UI
-cd web_ui
-python app.py
-```
-
-Access at: `http://localhost:8000`
+## Overview
+This guide covers deploying HardwareGenius in production using Docker.
 
 ---
 
-## 📋 System Architecture
+## Prerequisites
 
-### Components
-
-1. **Core Engine** (`core/`)
-   - Database layer
-   - Models and schemas
-   - Evidence management
-
-2. **Template System** (`templates/`)
-   - 12 production templates
-   - Template loader and validator
-   - Rule engine
-
-3. **Subsystem Solvers** (`solver/subsystems/`)
-   - 7 component category solvers
-   - Deterministic filtering and ranking
-   - Evidence-backed recommendations
-
-4. **Architecture Synthesis** (`architecture/`)
-   - Graph builder
-   - Constraint compiler
-   - BOM composer
-   - Configuration generator
-   - Export manager
-
-5. **Web UI** (`web_ui/`)
-   - FastAPI backend
-   - Responsive frontend
-   - Export functionality
+- Docker 20.10+
+- Docker Compose 2.0+
+- PostgreSQL 13+ (or use Docker Compose)
+- 4GB RAM minimum
+- 20GB disk space
 
 ---
 
-## 🗄️ Database Setup
+## Quick Start (Docker Compose)
 
-### PostgreSQL Configuration
-
-```sql
--- Create database
-CREATE DATABASE hardwaregenius;
-
--- Create user
-CREATE USER hg_user WITH PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE hardwaregenius TO hg_user;
-```
-
-### Environment Variables
+### 1. Environment Setup
 
 Create `.env` file:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://hg_user:your_password@localhost:5432/hardwaregenius
+DATABASE_URL=postgresql://postgres:your_password@db:5432/hardwaregenius
+POSTGRES_PASSWORD=your_password
 
-# OpenAI (optional, for LLM features)
-OPENAI_API_KEY=your_openai_key
+# API
+API_HOST=0.0.0.0
+API_PORT=8000
 
-# Redis (optional)
-REDIS_URL=redis://localhost:6379
-
-# Environment
-ENVIRONMENT=production
-DEBUG=false
+# Optional: OpenAI for LLM features
+OPENAI_API_KEY=sk-...
 ```
 
-### Run Migrations
+### 2. Start Services
 
 ```bash
-# Create tables
-python solver/subsystems/db_integration.py
+# Build and start all services
+docker-compose up -d
 
-# Ingest sample data
-python ingestion/batch_ingestion.py
+# Check logs
+docker-compose logs -f
+
+# Check health
+curl http://localhost:8000/health
 ```
+
+### 3. Initialize Database
+
+```bash
+# Run schema migrations
+docker-compose exec api python scripts/init_db.py
+
+# Populate firmware stacks
+docker-compose exec api python scripts/populate_firmware_stacks.py
+
+# Populate reference designs
+docker-compose exec api python scripts/populate_reference_designs.py
+```
+
+### 4. Access Application
+
+- **API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+- **Frontend**: http://localhost:8000/
 
 ---
 
-## 🌐 Web UI Deployment
+## Docker Configuration
 
-### Development
-
-```bash
-cd web_ui
-python app.py
-```
-
-### Production (with Gunicorn)
-
-```bash
-pip install gunicorn
-gunicorn web_ui.app:app --workers 4 --bind 0.0.0.0:8000
-```
-
-### Docker Deployment
+### Dockerfile
 
 ```dockerfile
-# Dockerfile
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    postgresql-client \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy application
 COPY . .
 
+# Expose port
 EXPOSE 8000
 
-CMD ["gunicorn", "web_ui.app:app", "--workers", "4", "--bind", "0.0.0.0:8000"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run server
+CMD ["python", "server.py"]
 ```
 
-```bash
-# Build and run
-docker build -t hardwaregenius .
-docker run -p 8000:8000 --env-file .env hardwaregenius
-```
-
-### Docker Compose
+### docker-compose.yml
 
 ```yaml
 version: '3.8'
 
 services:
-  web:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://hg_user:password@db:5432/hardwaregenius
-    depends_on:
-      - db
-  
   db:
-    image: postgres:14
+    image: postgres:17
     environment:
-      - POSTGRES_DB=hardwaregenius
-      - POSTGRES_USER=hg_user
-      - POSTGRES_PASSWORD=password
+      POSTGRES_DB: hardwaregenius
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./datasheets:/app/datasheets
+      - ./logs:/app/logs
+    restart: unless-stopped
 
 volumes:
   postgres_data:
@@ -190,247 +144,394 @@ volumes:
 
 ---
 
-## 📡 API Usage
+## Production Deployment
 
-### Parse Intent
+### 1. Cloud Deployment (AWS/GCP/Azure)
+
+#### AWS ECS
 
 ```bash
-curl -X POST http://localhost:8000/api/parse-intent \
-  -H "Content-Type: application/json" \
-  -d '{"input": "I want to build a CAN motor controller"}'
+# Build and push image
+docker build -t hardwaregenius:latest .
+docker tag hardwaregenius:latest <your-ecr-repo>:latest
+docker push <your-ecr-repo>:latest
+
+# Deploy using ECS task definition
+aws ecs create-service \\
+    --cluster hardwaregenius-cluster \\
+    --service-name hardwaregenius-api \\
+    --task-definition hardwaregenius:1 \\
+    --desired-count 2 \\
+    --launch-type FARGATE
 ```
 
-### List Templates
+#### Google Cloud Run
 
 ```bash
-curl http://localhost:8000/api/templates
+# Build and deploy
+gcloud builds submit --tag gcr.io/PROJECT_ID/hardwaregenius
+gcloud run deploy hardwaregenius \\
+    --image gcr.io/PROJECT_ID/hardwaregenius \\
+    --platform managed \\
+    --region us-central1 \\
+    --allow-unauthenticated
 ```
 
-### Build Architecture
+### 2. Kubernetes Deployment
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hardwaregenius-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hardwaregenius-api
+  template:
+    metadata:
+      labels:
+        app: hardwaregenius-api
+    spec:
+      containers:
+      - name: api
+        image: hardwaregenius:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: hardwaregenius-secrets
+              key: database-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hardwaregenius-api
+spec:
+  selector:
+    app: hardwaregenius-api
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+```
+
+---
+
+## Monitoring & Logging
+
+### 1. Application Logs
 
 ```bash
-curl -X POST http://localhost:8000/api/build-architecture \
-  -H "Content-Type: application/json" \
-  -d '{
-    "template_id": "can_motor_controller_v1",
-    "answers": {
-      "motor_type": "BLDC",
-      "supply_voltage": "24"
+# Docker Compose
+docker-compose logs -f api
+
+# Kubernetes
+kubectl logs -f deployment/hardwaregenius-api
+```
+
+### 2. Metrics (Prometheus)
+
+Add to `server.py`:
+
+```python
+from prometheus_client import Counter, Histogram, generate_latest
+
+# Metrics
+request_count = Counter('api_requests_total', 'Total API requests')
+request_duration = Histogram('api_request_duration_seconds', 'Request duration')
+
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type="text/plain")
+```
+
+### 3. Health Monitoring
+
+```bash
+# Check health endpoint
+curl http://localhost:8000/health
+
+# Expected response:
+{
+  "status": "healthy",
+  "database": "connected",
+  "stats": {
+    "total_parts": 1234,
+    "total_mcus": 567
+  }
+}
+```
+
+---
+
+## Scaling
+
+### Horizontal Scaling
+
+```bash
+# Docker Compose
+docker-compose up -d --scale api=3
+
+# Kubernetes
+kubectl scale deployment hardwaregenius-api --replicas=5
+```
+
+### Database Scaling
+
+- Use managed PostgreSQL (AWS RDS, Google Cloud SQL)
+- Enable read replicas for search queries
+- Use connection pooling (PgBouncer)
+
+---
+
+## Backup & Recovery
+
+### Database Backup
+
+```bash
+# Backup
+docker-compose exec db pg_dump -U postgres hardwaregenius > backup.sql
+
+# Restore
+docker-compose exec -T db psql -U postgres hardwaregenius < backup.sql
+```
+
+### Automated Backups
+
+```bash
+# Cron job (daily at 2 AM)
+0 2 * * * docker-compose exec db pg_dump -U postgres hardwaregenius | gzip > /backups/hardwaregenius_$(date +\%Y\%m\%d).sql.gz
+```
+
+---
+
+## Security
+
+### 1. API Authentication
+
+Add to `server.py`:
+
+```python
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer()
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    # Verify JWT token
+    if credentials.credentials != os.getenv("API_KEY"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return credentials
+```
+
+### 2. HTTPS/TLS
+
+Use reverse proxy (Nginx, Traefik):
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.hardwaregenius.com;
+
+    ssl_certificate /etc/ssl/certs/hardwaregenius.crt;
+    ssl_certificate_key /etc/ssl/private/hardwaregenius.key;
+
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
-  }'
+}
 ```
 
-### Export Design
-
-```bash
-curl -X POST http://localhost:8000/api/export \
-  -H "Content-Type: application/json" \
-  -d '{
-    "format": "kicad",
-    "bom": [...],
-    "project_name": "MyDesign"
-  }'
-```
-
----
-
-## 🔧 Configuration
-
-### Template Configuration
-
-Templates are stored in `templates/` directory:
-
-```
-templates/
-├── motor_controller/
-│   └── can_motor_controller.yaml
-├── sensor_node/
-│   └── iot_sensor_node.yaml
-└── ...
-```
-
-### Adding New Templates
-
-1. Create new directory in `templates/`
-2. Create YAML file following template schema
-3. Validate with `TemplateValidator`
-4. Restart application
-
-### Subsystem Solver Configuration
-
-Solvers are in `solver/subsystems/`:
-
-- `multi_solver.py` - Power, Transceiver, Sensor
-- `additional_solvers.py` - Memory, Display, Connector, Protection
-- `db_integration.py` - Database-connected solvers
-
----
-
-## 📊 Monitoring
-
-### Logging
+### 3. Rate Limiting
 
 ```python
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('hardwaregenius.log'),
-        logging.StreamHandler()
-    ]
-)
-```
-
-### Metrics
-
-Key metrics to monitor:
-
-- Request latency
-- Template match accuracy
-- BOM generation success rate
-- Export success rate
-- Database query performance
-
-### Health Check Endpoint
-
-```python
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "database": "connected",
-        "templates": len(template_loader.load_all_templates())
-    }
-```
-
----
-
-## 🔒 Security
-
-### Best Practices
-
-1. **Environment Variables**: Never commit `.env` files
-2. **Database**: Use strong passwords, enable SSL
-3. **API**: Implement rate limiting
-4. **Input Validation**: Sanitize all user inputs
-5. **CORS**: Configure allowed origins
-
-### Rate Limiting
-
-```python
-from slowapi import Limiter
+from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 
 limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 
-@app.post("/api/parse-intent")
-@limiter.limit("10/minute")
-async def parse_intent(request: Request):
+@app.get("/api/v1/search")
+@limiter.limit("100/hour")
+async def search(request: Request):
     ...
 ```
 
 ---
 
-## 🧪 Testing
+## Performance Optimization
 
-### Run Tests
+### 1. Database Indexing
 
-```bash
-# All tests
-pytest tests/
-
-# Specific test file
-pytest tests/test_phase2_system.py
-
-# With coverage
-pytest --cov=. tests/
+```sql
+-- Already created in schemas
+CREATE INDEX idx_parts_mpn ON parts(mpn);
+CREATE INDEX idx_parts_manufacturer ON parts(manufacturer);
+CREATE INDEX idx_mcu_specs_flash ON mcu_specs(flash_kb);
 ```
 
-### Test Categories
-
-- Unit tests: Template system, solvers
-- Integration tests: End-to-end pipeline
-- API tests: Web UI endpoints
-
----
-
-## 📦 Production Checklist
-
-- [ ] Database configured and migrated
-- [ ] Environment variables set
-- [ ] Templates validated
-- [ ] Component database populated (5K+ parts)
-- [ ] Web UI tested
-- [ ] API endpoints tested
-- [ ] Exports tested (Eagle, KiCad, etc.)
-- [ ] Logging configured
-- [ ] Monitoring setup
-- [ ] Backups configured
-- [ ] SSL/TLS enabled
-- [ ] Rate limiting enabled
-- [ ] Documentation updated
-
----
-
-## 🚀 Scaling
-
-### Horizontal Scaling
-
-- Use load balancer (nginx, HAProxy)
-- Multiple web server instances
-- Shared database
-- Redis for session management
-
-### Database Optimization
-
-- Index frequently queried fields
-- Use connection pooling
-- Implement caching layer
-- Regular VACUUM and ANALYZE
-
-### Caching Strategy
+### 2. Caching (Redis)
 
 ```python
-import redis
+import redis.asyncio as redis
 
-redis_client = redis.Redis(host='localhost', port=6379)
+cache = redis.Redis(host='localhost', port=6379)
 
-# Cache template matches
-cache_key = f"matches:{user_input_hash}"
-cached = redis_client.get(cache_key)
-if cached:
-    return json.loads(cached)
+@app.get("/api/v1/parts/{part_id}")
+async def get_part(part_id: str):
+    # Check cache
+    cached = await cache.get(f"part:{part_id}")
+    if cached:
+        return json.loads(cached)
+    
+    # Fetch from DB
+    part = await db.get_part(part_id)
+    
+    # Cache for 1 hour
+    await cache.setex(f"part:{part_id}", 3600, json.dumps(part))
+    return part
 ```
 
 ---
 
-## 📞 Support
+## Troubleshooting
 
-### Documentation
-- API Docs: `http://localhost:8000/docs`
-- Template Guide: `docs/template_authoring.md`
-- Architecture: `docs/architecture.md`
+### Common Issues
 
-### Troubleshooting
+**1. Database Connection Failed**
+```bash
+# Check database is running
+docker-compose ps db
 
-**Issue**: Database connection fails  
-**Solution**: Check DATABASE_URL, ensure PostgreSQL is running
+# Check connection string
+echo $DATABASE_URL
 
-**Issue**: Templates not loading  
-**Solution**: Validate YAML syntax, check file permissions
+# Test connection
+docker-compose exec db psql -U postgres -c "SELECT 1"
+```
 
-**Issue**: Export fails  
-**Solution**: Ensure output directory exists and is writable
+**2. API Not Responding**
+```bash
+# Check logs
+docker-compose logs api
+
+# Check health
+curl http://localhost:8000/health
+
+# Restart service
+docker-compose restart api
+```
+
+**3. Out of Memory**
+```bash
+# Check memory usage
+docker stats
+
+# Increase limits in docker-compose.yml
+services:
+  api:
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+```
 
 ---
 
-## 📄 License
+## CI/CD Pipeline
 
-MIT License - See LICENSE file
+### GitHub Actions
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Docker image
+        run: docker build -t hardwaregenius:${{ github.sha }} .
+      
+      - name: Run tests
+        run: docker run hardwaregenius:${{ github.sha }} python -m pytest
+      
+      - name: Push to registry
+        run: |
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          docker push hardwaregenius:${{ github.sha }}
+      
+      - name: Deploy to production
+        run: |
+          # Deploy to your cloud provider
+          kubectl set image deployment/hardwaregenius-api api=hardwaregenius:${{ github.sha }}
+```
 
 ---
 
-**HardwareGenius is production-ready and ready to scale!**
+## Maintenance
+
+### Regular Tasks
+
+1. **Weekly**: Review logs, check error rates
+2. **Monthly**: Update dependencies, security patches
+3. **Quarterly**: Database vacuum, backup verification
+
+### Update Procedure
+
+```bash
+# 1. Pull latest code
+git pull origin main
+
+# 2. Rebuild images
+docker-compose build
+
+# 3. Run migrations
+docker-compose exec api python scripts/migrate.py
+
+# 4. Restart services (zero-downtime)
+docker-compose up -d --no-deps --build api
+
+# 5. Verify health
+curl http://localhost:8000/health
+```
+
+---
+
+## Support
+
+For issues or questions:
+- GitHub Issues: https://github.com/your-org/hardwaregenius/issues
+- Documentation: https://docs.hardwaregenius.com
+- Email: support@hardwaregenius.com

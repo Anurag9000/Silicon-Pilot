@@ -170,18 +170,27 @@ class FieldExtractor:
             if match:
                 raw_value = match.group(1)
                 
-                # Apply unit conversion if needed
-                if unit_multiplier:
-                    # Extract unit from match
-                    unit_match = re.search(r'[KM]B?', match.group(0), re.IGNORECASE)
-                    if unit_match:
-                        unit = unit_match.group(0)[0].upper()
-                        multiplier = unit_multiplier.get(unit, 1)
-                        normalized_value = int(raw_value) * multiplier
+                try:
+                    if unit_multiplier:
+                        # Extract unit from match
+                        unit_match = re.search(r'[KM]B?', match.group(0), re.IGNORECASE)
+                        if unit_match:
+                            unit = unit_match.group(0)[0].upper()
+                            multiplier = unit_multiplier.get(unit, 1)
+                            normalized_value = int(float(raw_value) * multiplier)
+                        else:
+                            normalized_value = int(float(raw_value))
                     else:
-                        normalized_value = int(raw_value)
-                else:
-                    normalized_value = int(raw_value)
+                        # Try int, then float, then keep string
+                        try:
+                            normalized_value = int(raw_value)
+                        except ValueError:
+                            try:
+                                normalized_value = float(raw_value)
+                            except ValueError:
+                                normalized_value = raw_value
+                except Exception:
+                    normalized_value = raw_value
                 
                 return {
                     'field_name': field_name,
@@ -256,13 +265,19 @@ class FieldExtractor:
                 if unit:
                     number *= multipliers.get(unit.upper(), 1)
                 
-                return int(number)
+                try:
+                    return int(number)
+                except (ValueError, TypeError):
+                    return None
         
         elif field_name in ['temp_min_c', 'temp_max_c']:
             # Extract temperature
             match = re.search(r'-?\d+', cleaned)
             if match:
-                return int(match.group(0))
+                try:
+                    return int(match.group(0))
+                except (ValueError, TypeError):
+                    return None
         
         # Default: return cleaned string
         return cleaned
@@ -294,7 +309,10 @@ class FieldExtractor:
             for pattern in patterns:
                 match = re.search(pattern, text, re.IGNORECASE)
                 if match:
-                    peripherals[peripheral] = int(match.group(1))
+                    try:
+                        peripherals[peripheral] = int(match.group(1))
+                    except (ValueError, TypeError):
+                        pass
                     break
         
         # Boolean peripherals
@@ -306,3 +324,55 @@ class FieldExtractor:
             peripherals['ethernet'] = True
         
         return peripherals
+    def extract_all(self, text: str) -> Dict[str, Any]:
+        """
+        Extract all possible fields and peripherals from text.
+        
+        Args:
+            text: Text to search
+            
+        Returns:
+            Dict of all extracted specs
+        """
+        results = {}
+        
+        # Extract individual fields
+        for field_name in self.field_patterns.keys():
+            # For extraction from long text, we use page 0 and no bbox
+            extracted = self.extract_field(field_name, text, 0)
+            if extracted:
+                results[field_name] = extracted['normalized_value']
+        
+        # Extract peripherals
+        peripherals = self.extract_peripherals(text, 0)
+        results.update(peripherals)
+        
+        return results
+
+    def extract_all_with_metadata(self, text: str) -> Dict[str, Any]:
+        """
+        Extract all fields with full metadata (bbox, page, raw value).
+        
+        Returns:
+            Dict of field_name -> {normalized_value, raw_value, bbox, page}
+        """
+        results = {}
+        
+        # Extract individual fields
+        for field_name in self.field_patterns.keys():
+            extracted = self.extract_field(field_name, text, 0)
+            if extracted:
+                results[field_name] = extracted
+        
+        # Peripherals (no bbox support yet implies page 0, no bbox)
+        peripherals = self.extract_peripherals(text, 0)
+        for name, count in peripherals.items():
+            results[name] = {
+                'field_name': name,
+                'normalized_value': count,
+                'raw_value': str(count),
+                'bbox': None,
+                'page': 0
+            }
+            
+        return results

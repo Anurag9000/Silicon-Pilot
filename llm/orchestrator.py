@@ -4,7 +4,7 @@ LLM Orchestrator
 OpenAI integration for parsing requirements and generating responses
 with strict evidence-required enforcement.
 """
-
+from __future__ import annotations
 import logging
 import json
 from typing import Dict, List, Any, Optional
