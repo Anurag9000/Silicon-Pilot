@@ -131,6 +131,90 @@ async def get_template(template_id: str):
     }
 
 
+from pydantic import BaseModel
+from typing import Optional, List
+import asyncpg
+import os
+
+class SearchRequest(BaseModel):
+    query: Optional[str] = None
+    flash_min_kb: Optional[int] = None
+    flash_max_kb: Optional[int] = None
+    ram_min_kb: Optional[int] = None
+    freq_min_mhz: Optional[int] = None
+    io_count_min: Optional[int] = None
+    limit: int = 20
+
+@app.post("/api/search")
+async def search_parts(request: SearchRequest):
+    """
+    Faceted search for MCUs.
+    """
+    
+    DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    conn = await asyncpg.connect(DB_URL)
+    
+    try:
+        # Build query dynamically
+        query = """
+            SELECT p.id, p.mpn, p.manufacturer, p.datasheet_url,
+                   m.core, m.max_mhz, m.flash_kb, m.sram_kb,
+                   m.uart_count, m.spi_count, m.i2c_count, m.adc_count,
+                   m.cost_usd
+            FROM parts p
+            JOIN mcu_specs m ON p.id = m.part_id
+            WHERE 1=1
+        """
+        params = []
+        param_idx = 1
+        
+        if request.query:
+            query += f" AND (p.mpn ILIKE ${param_idx} OR p.family ILIKE ${param_idx})"
+            params.append(f"%{request.query}%")
+            param_idx += 1
+            
+        if request.flash_min_kb:
+            query += f" AND m.flash_kb >= ${param_idx}"
+            params.append(request.flash_min_kb)
+            param_idx += 1
+            
+        if request.flash_max_kb:
+            query += f" AND m.flash_kb <= ${param_idx}"
+            params.append(request.flash_max_kb)
+            param_idx += 1
+
+        if request.ram_min_kb:
+            query += f" AND m.sram_kb >= ${param_idx}"
+            params.append(request.ram_min_kb)
+            param_idx += 1
+            
+        if request.freq_min_mhz:
+            query += f" AND m.max_mhz >= ${param_idx}"
+            params.append(request.freq_min_mhz)
+            param_idx += 1
+            
+        # For IO count, we sum standard peripherals
+        if request.io_count_min:
+            # Approximation using peripheral counts
+            query += f" AND (m.uart_count + m.spi_count + m.i2c_count + m.adc_count) >= ${param_idx}"
+            params.append(request.io_count_min)
+            param_idx += 1
+            
+        query += f" ORDER BY m.cost_usd ASC NULLS LAST LIMIT ${param_idx}"
+        params.append(request.limit)
+        
+        rows = await conn.fetch(query, *params)
+        
+        results = []
+        for row in rows:
+            results.append(dict(row))
+            
+        return {"count": len(results), "results": results}
+        
+    finally:
+        await conn.close()
+
+
 @app.post("/api/build-architecture")
 async def build_architecture(request: Request):
     """Build architecture from template and answers"""

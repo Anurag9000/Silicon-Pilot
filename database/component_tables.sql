@@ -6,7 +6,7 @@
 -- ============================================================================
 
 -- PMICs (Power Management ICs)
-CREATE TABLE pmic_specs (
+CREATE TABLE IF NOT EXISTS pmic_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -40,11 +40,11 @@ CREATE TABLE pmic_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_pmic_specs_voltage ON pmic_specs(input_voltage_min_v, input_voltage_max_v);
-CREATE INDEX idx_pmic_specs_current ON pmic_specs(output_current_max_ma);
+CREATE INDEX IF NOT EXISTS idx_pmic_specs_voltage ON pmic_specs(input_voltage_min_v, input_voltage_max_v);
+CREATE INDEX IF NOT EXISTS idx_pmic_specs_current ON pmic_specs(output_current_max_ma);
 
 -- DC-DC Converters (Buck, Boost, Buck-Boost)
-CREATE TABLE dcdc_specs (
+CREATE TABLE IF NOT EXISTS dcdc_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -79,11 +79,11 @@ CREATE TABLE dcdc_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_dcdc_specs_voltage ON dcdc_specs(input_voltage_min_v, output_voltage_max_v);
-CREATE INDEX idx_dcdc_specs_current ON dcdc_specs(output_current_max_ma);
+CREATE INDEX IF NOT EXISTS idx_dcdc_specs_voltage ON dcdc_specs(input_voltage_min_v, output_voltage_max_v);
+CREATE INDEX IF NOT EXISTS idx_dcdc_specs_current ON dcdc_specs(output_current_max_ma);
 
 -- LDOs (Low-Dropout Regulators)
-CREATE TABLE ldo_specs (
+CREATE TABLE IF NOT EXISTS ldo_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -112,8 +112,8 @@ CREATE TABLE ldo_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_ldo_specs_voltage ON ldo_specs(output_voltage_v);
-CREATE INDEX idx_ldo_specs_current ON ldo_specs(output_current_max_ma);
+CREATE INDEX IF NOT EXISTS idx_ldo_specs_voltage ON ldo_specs(output_voltage_v);
+CREATE INDEX IF NOT EXISTS idx_ldo_specs_current ON ldo_specs(output_current_max_ma);
 
 
 -- ============================================================================
@@ -121,7 +121,7 @@ CREATE INDEX idx_ldo_specs_current ON ldo_specs(output_current_max_ma);
 -- ============================================================================
 
 -- CAN Transceivers
-CREATE TABLE can_transceiver_specs (
+CREATE TABLE IF NOT EXISTS can_transceiver_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -150,10 +150,10 @@ CREATE TABLE can_transceiver_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_can_transceiver_fd ON can_transceiver_specs(supports_can_fd);
+CREATE INDEX IF NOT EXISTS idx_can_transceiver_fd ON can_transceiver_specs(supports_can_fd);
 
 -- Ethernet PHYs
-CREATE TABLE ethernet_phy_specs (
+CREATE TABLE IF NOT EXISTS ethernet_phy_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -179,14 +179,14 @@ CREATE TABLE ethernet_phy_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_ethernet_phy_speed ON ethernet_phy_specs(supports_1000mbps, supports_100mbps);
+CREATE INDEX IF NOT EXISTS idx_ethernet_phy_speed ON ethernet_phy_specs(supports_1000mbps, supports_100mbps);
 
 
 -- ============================================================================
 -- SENSOR TABLES
 -- ============================================================================
 
-CREATE TABLE sensor_specs (
+CREATE TABLE IF NOT EXISTS sensor_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -221,15 +221,15 @@ CREATE TABLE sensor_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_sensor_type ON sensor_specs(sensor_type);
-CREATE INDEX idx_sensor_interface ON sensor_specs(interface_type);
+CREATE INDEX IF NOT EXISTS idx_sensor_type ON sensor_specs(sensor_type);
+CREATE INDEX IF NOT EXISTS idx_sensor_interface ON sensor_specs(interface_type);
 
 
 -- ============================================================================
 -- MEMORY TABLES
 -- ============================================================================
 
-CREATE TABLE memory_specs (
+CREATE TABLE IF NOT EXISTS memory_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -267,15 +267,15 @@ CREATE TABLE memory_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_memory_type ON memory_specs(memory_type);
-CREATE INDEX idx_memory_capacity ON memory_specs(capacity_kb, capacity_mb);
+CREATE INDEX IF NOT EXISTS idx_memory_type ON memory_specs(memory_type);
+CREATE INDEX IF NOT EXISTS idx_memory_capacity ON memory_specs(capacity_kb, capacity_mb);
 
 
 -- ============================================================================
 -- PASSIVE COMPONENT TABLES
 -- ============================================================================
 
-CREATE TABLE passive_specs (
+CREATE TABLE IF NOT EXISTS passive_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -311,16 +311,16 @@ CREATE TABLE passive_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_passive_type ON passive_specs(component_type);
-CREATE INDEX idx_passive_capacitance ON passive_specs(capacitance_uf);
-CREATE INDEX idx_passive_resistance ON passive_specs(resistance_ohm);
+CREATE INDEX IF NOT EXISTS idx_passive_type ON passive_specs(component_type);
+CREATE INDEX IF NOT EXISTS idx_passive_capacitance ON passive_specs(capacitance_uf);
+CREATE INDEX IF NOT EXISTS idx_passive_resistance ON passive_specs(resistance_ohm);
 
 
 -- ============================================================================
 -- CONNECTOR TABLES
 -- ============================================================================
 
-CREATE TABLE connector_specs (
+CREATE TABLE IF NOT EXISTS connector_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -352,15 +352,15 @@ CREATE TABLE connector_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_connector_type ON connector_specs(connector_type);
-CREATE INDEX idx_connector_pins ON connector_specs(pin_count);
+CREATE INDEX IF NOT EXISTS idx_connector_type ON connector_specs(connector_type);
+CREATE INDEX IF NOT EXISTS idx_connector_pins ON connector_specs(pin_count);
 
 
 -- ============================================================================
 -- PROTECTION COMPONENT TABLES
 -- ============================================================================
 
-CREATE TABLE protection_specs (
+CREATE TABLE IF NOT EXISTS protection_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
     
@@ -389,8 +389,8 @@ CREATE TABLE protection_specs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_protection_type ON protection_specs(protection_type);
-CREATE INDEX idx_protection_voltage ON protection_specs(breakdown_voltage_v);
+CREATE INDEX IF NOT EXISTS idx_protection_type ON protection_specs(protection_type);
+CREATE INDEX IF NOT EXISTS idx_protection_voltage ON protection_specs(breakdown_voltage_v);
 
 
 -- ============================================================================

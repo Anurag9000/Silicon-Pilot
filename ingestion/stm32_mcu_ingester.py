@@ -276,7 +276,7 @@ async def generate_stm32_variants(conn: asyncpg.Connection):
                             INSERT INTO mcu_specs (
                                 part_id, core, max_mhz, flash_kb, sram_kb,
                                 can_count, spi_count, i2c_count,
-                                usb_fs, adc_channels, dac_channels
+                                usb_count, adc_count, dac_count
                             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                             ON CONFLICT (part_id) DO UPDATE
                             SET core = EXCLUDED.core,
@@ -284,8 +284,8 @@ async def generate_stm32_variants(conn: asyncpg.Connection):
                                 flash_kb = EXCLUDED.flash_kb,
                                 sram_kb = EXCLUDED.sram_kb
                         """, part_id, core, max_freq, flash_kb, ram_kb,
-                            # Peripheral counts (estimated based on family)
-                            1, 2, 2, True, 1, 1)
+                            # Peripheral counts (Initialized to 0, to be filled by datasheet extractor)
+                            0, 0, 0, False, 0, 0)
                         
                         total_parts += 1
             

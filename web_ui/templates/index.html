@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +13,7 @@
             --bg: #f8fafc;
             --card-bg: #ffffff;
         }
-        
+
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
             background-color: var(--bg);
@@ -27,7 +28,7 @@
             text-align: center;
             margin-bottom: 3rem;
         }
-        
+
         .header h1 {
             font-size: 2.5rem;
             color: var(--primary);
@@ -134,13 +135,14 @@
             border: 2px solid red;
             background: rgba(255, 0, 0, 0.1);
         }
-        
+
         .loading {
             opacity: 0.5;
             pointer-events: none;
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>HardwareGenius</h1>
@@ -152,7 +154,8 @@
         <div class="left-col">
             <div class="card">
                 <h2>1. Requirements</h2>
-                <textarea id="intentInput" rows="4" placeholder="Describe your system (e.g., 'Need a constrained STM32 for a standard CAN motor controller with 512KB flash')"></textarea>
+                <textarea id="intentInput" rows="4"
+                    placeholder="Describe your system (e.g., 'Need a constrained STM32 for a standard CAN motor controller with 512KB flash')"></textarea>
                 <button onclick="parseRequirements()">Analyze Requirements</button>
             </div>
 
@@ -166,7 +169,7 @@
                 <div id="questionsList"></div>
                 <button onclick="submitAnswers()" style="margin-top: 1rem;">Update Spec</button>
             </div>
-            
+
             <div class="card">
                 <h2>Admin</h2>
                 <button onclick="triggerIngestion()" style="background-color: #475569;">Trigger Ingestion</button>
@@ -185,6 +188,40 @@
         </div>
     </div>
 
+    <!-- PIN MUX SECTION -->
+    <div class="card">
+        <h2>Pin Mux Solver</h2>
+        <div class="grid">
+            <div>
+                <label for="pm-part-id">Part ID (from Search)</label>
+                <input type="text" id="pm-part-id" placeholder="UUID..."
+                    style="width: 100%; padding: 0.5rem; margin-bottom: 1rem;">
+
+                <h3>Requirements</h3>
+                <div id="pm-reqs">
+                    <div class="req-row" style="margin-bottom: 0.5rem;">
+                        <select class="req-type">
+                            <option value="uart">UART</option>
+                            <option value="spi">SPI</option>
+                            <option value="i2c">I2C</option>
+                            <option value="adc">ADC</option>
+                        </select>
+                        <input type="text" class="req-name" placeholder="Name (e.g. USART1_TX)">
+                    </div>
+                </div>
+                <button onclick="addReqRow()">+ Add Requirement</button>
+                <br><br>
+                <button onclick="solvePinMux()">Solve Pin Mux</button>
+            </div>
+
+            <div>
+                <h3>Results</h3>
+                <pre id="pm-results"
+                    style="background: #f1f5f9; padding: 1rem; border-radius: 8px; overflow: auto; max-height: 400px;">No solution yet.</pre>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentSpecId = null;
 
@@ -196,26 +233,26 @@
             try {
                 const res = await fetch('/spec/from_text', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text })
                 });
                 const data = await res.json();
-                
+
                 currentSpecId = data.spec_id;
                 renderSpec(data.spec);
-                
+
                 // If parses immediately to candidates, fetch them
                 if (data.candidates_count > 0) {
                     await fetchRecommendations();
                 }
-                
+
                 // If questions, show them
                 if (data.questions && data.questions.questions.length > 0) {
                     renderQuestions(data.questions.questions);
                 } else {
-                     document.getElementById('questionsCard').style.display = 'none';
+                    document.getElementById('questionsCard').style.display = 'none';
                 }
-                
+
             } catch (e) {
                 alert('Error: ' + e.message);
             }
@@ -225,31 +262,31 @@
         async function fetchRecommendations() {
             const res = await fetch('/recommend', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ spec_id: currentSpecId })
             });
             const data = await res.json();
             renderCandidates(data.candidates);
         }
-        
+
         async function triggerIngestion() {
-             const btn = event.target;
-             btn.disabled = true;
-             document.getElementById('adminStatus').innerText = "Starting ingestion...";
-             try {
-                 const res = await fetch('/admin/ingest', { method: 'POST' });
-                 const data = await res.json();
-                 document.getElementById('adminStatus').innerText = "✓ " + data.status;
-             } catch(e) {
-                 document.getElementById('adminStatus').innerText = "Error: " + e.message;
-             }
-             setTimeout(() => btn.disabled = false, 2000);
+            const btn = event.target;
+            btn.disabled = true;
+            document.getElementById('adminStatus').innerText = "Starting ingestion...";
+            try {
+                const res = await fetch('/admin/ingest', { method: 'POST' });
+                const data = await res.json();
+                document.getElementById('adminStatus').innerText = "✓ " + data.status;
+            } catch (e) {
+                document.getElementById('adminStatus').innerText = "Error: " + e.message;
+            }
+            setTimeout(() => btn.disabled = false, 2000);
         }
 
         function renderSpec(spec) {
             const list = document.getElementById('specList');
             let html = '';
-            
+
             // Hard constraints
             for (const [k, v] of Object.entries(spec.hard_constraints)) {
                 html += `<div class="spec-item"><span>${k}</span><strong>${v}</strong></div>`;
@@ -258,7 +295,7 @@
             if (spec.unknowns.length > 0) {
                 html += `<div class="spec-item" style="color: #ef4444;"><span>Missing</span><strong>${spec.unknowns.join(', ')}</strong></div>`;
             }
-            
+
             list.innerHTML = html;
             document.getElementById('specCard').style.display = 'block';
         }
@@ -313,6 +350,88 @@
         function setLoading(isLoading) {
             document.body.classList.toggle('loading', isLoading);
         }
+
+        // --- PIN MUX FUNCTIONS ---
+        function addReqRow() {
+            const div = document.createElement('div');
+            div.className = 'req-row';
+            div.style.marginBottom = '0.5rem';
+            div.innerHTML = `
+                <select class="req-type">
+                    <option value="uart">UART</option>
+                    <option value="spi">SPI</option>
+                    <option value="i2c">I2C</option>
+                    <option value="adc">ADC</option>
+                </select>
+                <input type="text" class="req-name" placeholder="Name (e.g. USART1_TX)">
+            `;
+            document.getElementById('pm-reqs').appendChild(div);
+        }
+
+        async function solvePinMux() {
+            const partId = document.getElementById('pm-part-id').value;
+            if (!partId) return alert("Enter Part ID");
+
+            const reqs = [];
+            document.querySelectorAll('.req-row').forEach(row => {
+                const type = row.querySelector('.req-type').value;
+                const name = row.querySelector('.req-name').value;
+                if (name) {
+                    reqs.push({
+                        function_type: type,
+                        function_name: name,
+                        required: true
+                    });
+                }
+            });
+
+            const res = document.getElementById('pm-results');
+            res.textContent = "Solving...";
+
+            try {
+                const response = await fetch(`/api/parts/${partId}/solve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reqs)
+                });
+
+                const data = await response.json();
+                res.textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                res.textContent = "Error: " + e;
+            }
+        }
+
+        async function calcPower() {
+            const partId = document.getElementById('pm-part-id').value; // Reuse part ID input
+            if (!partId) return alert("Enter Part ID in Pin Mux section");
+
+            const run = parseFloat(document.getElementById('pwr-run').value);
+            const sleep = parseFloat(document.getElementById('pwr-sleep').value);
+            const stop = parseFloat(document.getElementById('pwr-stop').value);
+
+            const res = document.getElementById('pwr-results');
+            res.textContent = "Calculating...";
+
+            try {
+                const response = await fetch(`/api/parts/${partId}/power`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        run_percent: run,
+                        sleep_percent: sleep,
+                        stop_percent: stop,
+                        peripherals: []
+                    })
+                });
+
+                const data = await response.json();
+                res.textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                res.textContent = "Error: " + e;
+            }
+        }
     </script>
 </body>
+
 </html>

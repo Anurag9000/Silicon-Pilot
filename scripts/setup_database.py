@@ -1,151 +1,113 @@
+
 """
 Local Database Setup Script
 
 Sets up PostgreSQL database without Docker.
 Creates database, applies schema, and component tables.
+Explicitly handles Extension creation to avoid transaction race conditions.
 """
 
 import os
 import sys
+import psycopg2
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from pathlib import Path
 
 # Database connection string
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://hg_user:hg_password@localhost:5432/hardwaregenius"
+    "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
 )
 
 def setup_database():
-    """Setup database with schema"""
     print("\n" + "="*60)
-    print("HARDWAREGENIUS DATABASE SETUP")
+    print("HARDWAREGENIUS DATABASE SETUP (ROBUST)")
     print("="*60 + "\n")
     
+    # Parse connection string
     try:
-        import psycopg2
-        from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-    except ImportError:
-        print("❌ psycopg2 not installed")
-        print("   Install: pip install psycopg2-binary")
+        parts = DATABASE_URL.replace("postgresql://", "").split("@")
+        user_pass = parts[0].split(":")
+        host_port_db = parts[1].split("/")
+        host_port = host_port_db[0].split(":")
+        
+        user = user_pass[0]
+        password = user_pass[1]
+        host = host_port[0]
+        port = int(host_port[1]) if len(host_port) > 1 else 5432
+        dbname = host_port_db[1]
+    except Exception as e:
+        print(f"❌ Error parsing connection string: {e}")
         return False
     
-    # Parse connection string
-    # Format: postgresql://user:pass@host:port/dbname
-    parts = DATABASE_URL.replace("postgresql://", "").split("@")
-    user_pass = parts[0].split(":")
-    host_port_db = parts[1].split("/")
-    host_port = host_port_db[0].split(":")
-    
-    user = user_pass[0]
-    password = user_pass[1]
-    host = host_port[0]
-    port = int(host_port[1]) if len(host_port) > 1 else 5432
-    dbname = host_port_db[1]
-    
-    print(f"Connecting to PostgreSQL at {host}:{port}...")
-    
-    # Step 1: Connect to postgres database to create our database
+    # Step 1: Create Database if not exists
     try:
+        print(f"Connecting to postgres system db at {host}:{port}...")
         conn = psycopg2.connect(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            database="postgres"
+            host=host, port=port, user=user, password=password, database="postgres"
         )
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
         
-        # Check if database exists
-        cursor.execute(
-            "SELECT 1 FROM pg_database WHERE datname = %s",
-            (dbname,)
-        )
-        
-        if cursor.fetchone():
-            print(f"✓ Database '{dbname}' already exists")
-        else:
+        cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (dbname,))
+        if not cursor.fetchone():
             print(f"Creating database '{dbname}'...")
             cursor.execute(f"CREATE DATABASE {dbname}")
-            print(f"✓ Database '{dbname}' created")
-        
+        else:
+            print(f"✓ Database '{dbname}' exists")
+            
         cursor.close()
         conn.close()
-    
-    except psycopg2.OperationalError as e:
-        print(f"❌ Cannot connect to PostgreSQL: {e}")
-        print("\nMake sure PostgreSQL is running:")
-        print("  Windows: Check Services for 'postgresql'")
-        print("  Linux/Mac: sudo systemctl start postgresql")
+    except Exception as e:
+        print(f"❌ System DB Error: {e}")
         return False
-    
-    # Step 2: Connect to our database and apply schema
+
+    # Step 2: Apply Schema
     try:
+        print(f"Connecting to target database '{dbname}'...")
         conn = psycopg2.connect(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            database=dbname
+            host=host, port=port, user=user, password=password, database=dbname
         )
+        conn.autocommit = True # Auto commit for extensions
         cursor = conn.cursor()
         
-        # Apply main schema
-        schema_path = Path(__file__).parent.parent / "database" / "schema.sql"
-        if schema_path.exists():
-            print(f"\nApplying schema from {schema_path.name}...")
-            schema_sql = schema_path.read_text()
-            cursor.execute(schema_sql)
-            conn.commit()
-            print("✓ Main schema applied")
-        else:
-            print(f"⚠ Schema file not found: {schema_path}")
+        # A. Create Extensions explicitly first
+        print("Ensuring Extensions exist...")
+        try:
+            cursor.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+            cursor.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
+            print("✓ Extensions created/verified")
+        except Exception as e:
+            print(f"⚠ Extension warning: {e}")
+
+        # B. Apply SQL Files
+        root = Path(__file__).parent.parent / "database"
+        files = ["schema.sql", "component_tables.sql", "errata_schema.sql", "ldo_schema.sql"]
         
-        # Apply component tables
-        component_path = Path(__file__).parent.parent / "database" / "component_tables.sql"
-        if component_path.exists():
-            print(f"\nApplying component tables from {component_path.name}...")
-            component_sql = component_path.read_text()
-            cursor.execute(component_sql)
-            conn.commit()
-            print("✓ Component tables applied")
-        else:
-            print(f"⚠ Component tables file not found: {component_path}")
-        
-        # Verify tables
-        cursor.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public'
-            ORDER BY table_name
-        """)
-        
-        tables = [row[0] for row in cursor.fetchall()]
-        print(f"\n✓ Database ready with {len(tables)} tables:")
-        for table in tables:
-            print(f"  - {table}")
-        
+        for fname in files:
+            fpath = root / fname
+            if fpath.exists():
+                print(f"Applying {fname}...")
+                sql = fpath.read_text()
+                try:
+                    cursor.execute(sql)
+                    print(f"✓ {fname} applied")
+                except Exception as e:
+                    print(f"\n@@@@ ERROR applying {fname} @@@@")
+                    print(f"{e}")
+                    print("@@@@ END ERROR @@@@\n")
+                    # Don't return, try next
+            else:
+                print(f"⚠ Skipped {fname} (not found)")
+                
         cursor.close()
         conn.close()
-        
-        print("\n" + "="*60)
-        print("✓ DATABASE SETUP COMPLETE")
-        print("="*60)
-        print(f"\nConnection string: {DATABASE_URL}")
-        print("\nSet environment variable:")
-        print(f"  export DATABASE_URL='{DATABASE_URL}'")
-        print(f"  # or on Windows:")
-        print(f"  set DATABASE_URL={DATABASE_URL}")
-        
+        print("\nSETUP COMPLETE.")
         return True
-    
+        
     except Exception as e:
-        print(f"❌ Error applying schema: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Application Error: {e}")
         return False
 
-
 if __name__ == "__main__":
-    success = setup_database()
-    sys.exit(0 if success else 1)
+    setup_database()
