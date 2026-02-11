@@ -1,3 +1,0 @@
-  File "D:\Done,Toreview\HardwareGenius\ingestion\run_stm32_ingestion.py", line 46
-    async def ingest_all(self):
-IndentationError: unexpected indent
