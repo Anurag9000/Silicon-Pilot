@@ -23,10 +23,8 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Database URL
-DB_URL = os.getenv("DATABASE_URL")
-if not DB_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
+# Database URL will be fetched in main()
+DB_URL = None
 
 
 # STM32 Family Specifications
@@ -297,6 +295,12 @@ async def generate_stm32_variants(conn: asyncpg.Connection):
 
 
 async def main():
+    global DB_URL
+    DB_URL = os.getenv("DATABASE_URL")
+    if not DB_URL:
+        # Fallback for manual run
+        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        
     print("="*60)
     print(" "*15 + "STM32 MCU INGESTION")
     print("="*60 + "\n")

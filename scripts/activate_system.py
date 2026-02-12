@@ -43,6 +43,10 @@ def git_sync():
     return run_command(["git", "push"], "Pushing to remote")
 
 def main():
+    # Ensure DATABASE_URL is set for all child processes
+    if not os.getenv("DATABASE_URL"):
+        os.environ["DATABASE_URL"] = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        
     logger.info("HardwareGenius Master Activation Sequence Initiated")
     
     # 1. Initialize Database
