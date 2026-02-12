@@ -26,10 +26,11 @@ def start_server():
     logger.info("Starting Backend Server...")
     # Run server as a detached process
     try:
+        log_file = open("server.log", "w")
         if sys.platform == "win32":
-            subprocess.Popen([PYTHON_EXE, "server.py"], cwd=str(ROOT_DIR), creationflags=subprocess.CREATE_NEW_CONSOLE)
+            subprocess.Popen([PYTHON_EXE, "server.py"], cwd=str(ROOT_DIR), creationflags=subprocess.CREATE_NEW_CONSOLE, env=os.environ, stdout=log_file, stderr=log_file)
         else:
-            subprocess.Popen([PYTHON_EXE, "server.py"], cwd=str(ROOT_DIR))
+            subprocess.Popen([PYTHON_EXE, "server.py"], cwd=str(ROOT_DIR), env=os.environ, stdout=log_file, stderr=log_file)
         return True
     except Exception as e:
         logger.error(f"❌ Failed to start server: {e}")
