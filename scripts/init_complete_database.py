@@ -62,10 +62,13 @@ def run_psql_file(filepath, db=DB_NAME):
 
 def run_python_script(script_path):
     """Run a Python script"""
-    result = subprocess.run([sys.executable, script_path], capture_output=True, text=True)
+    result = subprocess.run([sys.executable, script_path], capture_output=True, text=True, env=os.environ)
     return result.returncode == 0, result.stdout, result.stderr
 
 def main():
+    # Set DATABASE_URL for child processes
+    os.environ["DATABASE_URL"] = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    
     print("="*70)
     print(" "*15 + "HARDWAREGENIUS DATABASE INITIALIZATION")
     print("="*70 + "\n")
