@@ -158,8 +158,10 @@ class ConstraintCompiler:
             try:
                 from architecture.intelligent_optimizer import IntelligentConstraintOptimizer
                 self.optimizer = IntelligentConstraintOptimizer()
-            except ImportError:
-                print("Warning: Intelligent optimizer not available")
+            except Exception as e:
+                import traceback
+                print(f"Warning: Intelligent optimizer init failed: {e}")
+                traceback.print_exc()
                 self.optimizer = None
         else:
             self.optimizer = None

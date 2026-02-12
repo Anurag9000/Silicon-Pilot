@@ -165,77 +165,88 @@ class PinMuxSolver:
         """
         Solve pin muxing for given requirements
         """
-        # Get pin functions
-        pin_map = await self.get_pin_functions(part_id)
-        
-        if not pin_map:
+        try:
+            # Get pin functions
+            pin_map = await self.get_pin_functions(part_id)
+            
+            if not pin_map:
+                return {
+                    'success': False,
+                    'assignments': {},
+                    'conflicts': [],
+                    'unassigned': [req.function_name for req in requirements],
+                    'error': 'No pin data available for this MCU'
+                }
+            
+            # Get constraints
+            # constraints = await self.get_constraints(part_id) # Unused for now
+            
+            assignments = {}
+            unassigned = []
+            
+            # Sort requirements: required first, then by preferred pins
+            sorted_reqs = sorted(requirements, 
+                               key=lambda r: (not r.required, len(r.preferred_pins or [])))
+            
+            # Assign pins using greedy algorithm with backtracking
+            used_pins = set()
+            
+            for req in sorted_reqs:
+                # Find candidate pins
+                candidates = self.find_pins_for_function(pin_map, req.function_name)
+                
+                if not candidates:
+                    if req.required:
+                        unassigned.append(req.function_name)
+                    continue
+                
+                # Filter out already used pins
+                available = [(pin, af) for pin, af in candidates if pin not in used_pins]
+                
+                if not available:
+                    if req.required:
+                        unassigned.append(req.function_name)
+                    continue
+                
+                # Prefer pins from preferred list
+                if req.preferred_pins:
+                    preferred = [(pin, af) for pin, af in available 
+                               if pin in req.preferred_pins]
+                    if preferred:
+                        available = preferred
+                
+                # Assign first available pin
+                pin_name, af = available[0]
+                assignments[req.function_name] = PinAssignment(
+                    pin_name=pin_name,
+                    pin_number=pin_map[pin_name]['pin_number'],
+                    function_type=req.function_type,
+                    function_name=req.function_name,
+                    alternate_function=af
+                )
+                used_pins.add(pin_name)
+            
+            # Check for conflicts
+            conflicts = self.check_conflicts(assignments)
+            
+            success = len(conflicts) == 0 and len(unassigned) == 0
+            
+            return {
+                'success': success,
+                'assignments': assignments,
+                'conflicts': conflicts,
+                'unassigned': unassigned
+            }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             return {
                 'success': False,
                 'assignments': {},
                 'conflicts': [],
-                'unassigned': [req.function_name for req in requirements],
-                'error': 'No pin data available for this MCU'
+                'unassigned': [],
+                'error': str(e)
             }
-        
-        # Get constraints
-        # constraints = await self.get_constraints(part_id) # Unused for now
-        
-        assignments = {}
-        unassigned = []
-        
-        # Sort requirements: required first, then by preferred pins
-        sorted_reqs = sorted(requirements, 
-                           key=lambda r: (not r.required, len(r.preferred_pins or [])))
-        
-        # Assign pins using greedy algorithm with backtracking
-        used_pins = set()
-        
-        for req in sorted_reqs:
-            # Find candidate pins
-            candidates = self.find_pins_for_function(pin_map, req.function_name)
-            
-            if not candidates:
-                if req.required:
-                    unassigned.append(req.function_name)
-                continue
-            
-            # Filter out already used pins
-            available = [(pin, af) for pin, af in candidates if pin not in used_pins]
-            
-            if not available:
-                if req.required:
-                    unassigned.append(req.function_name)
-                continue
-            
-            # Prefer pins from preferred list
-            if req.preferred_pins:
-                preferred = [(pin, af) for pin, af in available 
-                           if pin in req.preferred_pins]
-                if preferred:
-                    available = preferred
-            
-            # Assign first available pin
-            pin_name, af = available[0]
-            assignments[req.function_name] = PinAssignment(
-                pin_name=pin_name,
-                pin_number=pin_map[pin_name]['pin_number'],
-                function_type=req.function_type,
-                function_name=req.function_name,
-                alternate_function=af
-            )
-            used_pins.add(pin_name)
-        
-        # Check for conflicts
-        conflicts = self.check_conflicts(assignments)
-        
-        success = len(conflicts) == 0 and len(unassigned) == 0
-        
-        return {
-            'success': success,
-            'assignments': assignments,
-            'conflicts': conflicts,
-            'unassigned': unassigned
-        }
     
     async def validate_electrical(self, part_id: uuid.UUID,
                                   assignments: Dict[str, PinAssignment]) -> List[str]:

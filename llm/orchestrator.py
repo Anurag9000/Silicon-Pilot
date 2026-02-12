@@ -45,17 +45,18 @@ class LLMOrchestrator:
         """
         logger.info("Parsing requirements with LLM")
         
-        system_prompt = """You are a hardware requirements parser for an MCU selection system.
+        system_prompt = """You are a hardware requirements parser for an electronic component selection system.
 
 Your task is to extract structured constraints from natural language.
 
 CRITICAL RULES:
-1. Only extract constraints that are explicitly stated
-2. Mark uncertain fields in "unknowns"
-3. If you make assumptions, list them in "assumptions"
-4. Do NOT invent specifications
+1. Identify the "component_type" (mcu, pmic, ldo, dcdc, sensor, passive, can, etc.)
+2. Only extract constraints that are explicitly stated
+3. Mark uncertain fields in "unknowns"
+4. If you make assumptions, list them in "assumptions"
 
 Output a JSON object with:
+- component_type: The category of component (default: "mcu")
 - hard_constraints: Must-have requirements (exact values or ranges)
 - soft_preferences: Nice-to-have features with weights
 - environment: Temperature, certifications, etc.
@@ -66,6 +67,7 @@ Output a JSON object with:
 Example input: "Need Cortex-M4, at least 512KB flash, 2 CAN, QFP package"
 Example output:
 {
+  "component_type": "mcu",
   "hard_constraints": {
     "core": "ARM Cortex-M4",
     "flash_kb": {"min": 512},
@@ -76,6 +78,20 @@ Example output:
     "can": 2
   },
   "unknowns": ["temp_range", "ram_kb", "clock_mhz"],
+  "assumptions": []
+}
+
+Example input: "I need a 3.3V LDO with 500mA output and low noise"
+Example output:
+{
+  "component_type": "ldo",
+  "hard_constraints": {
+    "ldo_vout": 3.3,
+    "ldo_iout": {"min": 500},
+    "noise": "low"
+  },
+  "interfaces": {},
+  "unknowns": ["vin_max", "package"],
   "assumptions": []
 }
 """
@@ -96,9 +112,14 @@ Example output:
         content = response.choices[0].message.content
         parsed = json.loads(content)
         
+        # Inject component_type into hard_constraints for HardFilter to use
+        hard_constraints = parsed.get('hard_constraints', {})
+        if 'component_type' in parsed:
+            hard_constraints['component_type'] = parsed['component_type']
+        
         # Build RequirementSpec
         spec = RequirementSpec(
-            hard_constraints=parsed.get('hard_constraints', {}),
+            hard_constraints=hard_constraints,
             soft_preferences=parsed.get('soft_preferences', {}),
             environment=parsed.get('environment', {}),
             interfaces=parsed.get('interfaces', {}),

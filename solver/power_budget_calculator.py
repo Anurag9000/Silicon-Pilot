@@ -84,8 +84,8 @@ class BatteryLife:
 class PowerBudgetCalculator:
     """Calculate system power consumption"""
     
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.db_pool = db_pool
     
     async def get_mcu_power(self, part_id: uuid.UUID, mode: PowerMode,
                            frequency_mhz: Optional[float] = None) -> Optional[float]:
@@ -94,9 +94,7 @@ class PowerBudgetCalculator:
         
         Returns power in microwatts (µW)
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             # Get power data for mode
             power_data = await conn.fetchrow("""
                 SELECT voltage_v, current_typ_ua, frequency_mhz
@@ -112,9 +110,6 @@ class PowerBudgetCalculator:
             # Power = Voltage × Current
             power_uw = power_data['voltage_v'] * power_data['current_typ_ua']
             return power_uw
-            
-        finally:
-            await conn.close()
     
     async def get_peripheral_power(self, part_id: uuid.UUID,
                                    peripheral_type: str,
@@ -124,9 +119,7 @@ class PowerBudgetCalculator:
         
         Returns power in microwatts (µW)
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             query = """
                 SELECT current_typ_ua
                 FROM peripheral_power
@@ -146,9 +139,6 @@ class PowerBudgetCalculator:
                 # Assume 3.3V for peripherals
                 return 3.3 * result
             return None
-            
-        finally:
-            await conn.close()
     
     async def calculate_mcu_power(self, part_id: uuid.UUID,
                                  mode_profiles: List[ModeProfile]) -> Dict[str, float]:

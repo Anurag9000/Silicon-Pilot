@@ -87,6 +87,7 @@ class ConstraintCompiler:
         """
         # Map field names to database columns
         field_map = {
+            # MCUs
             'core': 'm.core',
             'core_architecture': 'm.core',
             'flash_kb': 'm.flash_kb',
@@ -104,6 +105,41 @@ class ConstraintCompiler:
             'ethernet': 'm.ethernet',
             'has_fpu': 'm.has_fpu',
             'has_wireless': 'm.has_wireless',
+            'cost_usd': 'm.cost_usd',
+
+            # LDOs
+            'ldo_vin_min': 'l.vin_min_v',
+            'ldo_vin_max': 'l.vin_max_v',
+            'ldo_vout': 'l.vout_fixed_v',
+            'ldo_iout': 'l.iout_max_ma',
+            'dropout': 'l.dropout_voltage_mv',
+            'psrr': 'l.psrr_db',
+            'noise': 'l.output_noise_uv',
+
+            # PMICs
+            'buck_count': 'pm.buck_count',
+            'ldo_count': 'pm.ldo_count', 
+            'input_voltage_min': 'pm.input_voltage_min_v',
+            'input_voltage_max': 'pm.input_voltage_max_v',
+            'automotive_grade': 'pm.automotive_grade',
+
+            # CAN
+            'data_rate': 'c.data_rate_mbps',
+            'can_supply': 'c.supply_voltage_v',
+            'standby_mode': 'c.has_standby_mode',
+
+            # Sensors
+            'sensor_type': 's.sensor_type',
+            'interface': 's.interface',
+            'resolution': 's.resolution_bits',
+
+            # Passives
+            'passive_type': 'psv.type',
+            'value': 'psv.value_primary',
+            'package_case': 'psv.package_case', 
+            'power_rating': 'psv.power_rating_w',
+
+            # Common
             'package_family': 'p.package_family',
             'package': 'p.package_family',
             'pin_count': 'p.pin_count',
@@ -111,7 +147,6 @@ class ConstraintCompiler:
             'temp_max_c': 'p.temp_max_c',
             'status': 'p.status',
             'manufacturer': 'p.manufacturer',
-            'cost_usd': 'm.cost_usd',
         }
         
         db_field = field_map.get(field_name)

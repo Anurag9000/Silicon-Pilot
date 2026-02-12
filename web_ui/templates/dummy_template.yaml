@@ -1,0 +1,12 @@
+
+id: "dummy_template"
+name: "Dummy Template"
+device_type: "wearable"
+description: "A dummy template for system verification"
+version: "1.0"
+subsystems:
+  compute:
+    required_functions: []
+    baseline_constraints: {}
+questions: []
+rules: []

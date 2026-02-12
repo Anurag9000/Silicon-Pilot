@@ -185,7 +185,7 @@ async def parse_intent(request: Request):
 @app.get("/api/templates")
 async def list_templates():
     """List all available templates"""
-    templates_list = template_loader.load_all_templates()
+    templates_list = template_loader.list_all_templates()
     
     return {
         "templates": [
@@ -236,12 +236,13 @@ async def build_architecture(request: Request):
     template_id = data.get("template_id")
     answers = data.get("answers", {})
     
-    template = template_loader.load_template(template_id)
+    template = template_loader.get_template(template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     
-    builder = ArchitectureBuilder()
-    architecture = builder.build_architecture(template, answers)
+    from architecture.compiler import build_architecture_from_template
+    
+    architecture = build_architecture_from_template(template, answers)
     
     compiler = ConstraintCompiler()
     # req_spec = compiler.compile_constraints(architecture) # unused in frontend for now
@@ -345,31 +346,41 @@ class SearchRequest(BaseModel):
 @app.post("/api/search")
 async def search_parts(request: SearchRequest):
     """
-    Faceted search for MCUs.
+    Faceted search for all component types (MCU, LDO, PMIC, etc).
     """
-    # Use the global db pool
     if not db.pool:
         raise HTTPException(status_code=503, detail="Database not initialized")
         
     async with db.pool.acquire() as conn:
-        # Build query dynamically
+        # 1. Base Query on Parts
+        # We use COALESCE/JSON construction to handle polymorphic specs
         query = """
-            SELECT p.id, p.mpn, p.manufacturer, p.datasheet_url,
+            SELECT p.id, p.mpn, p.manufacturer, p.family, p.datasheet_url, p.package_family,
                    m.core, m.max_mhz, m.flash_kb, m.sram_kb,
-                   m.uart_count, m.spi_count, m.i2c_count, m.adc_count,
-                   m.cost_usd
+                   l.vin_min_v as ldo_vin_min, l.vout_fixed_v as ldo_vout, l.iout_max_ma as ldo_iout,
+                   pm.buck_count, pm.ldo_count,
+                   c.data_rate_mbps as can_rate,
+                   s.sensor_type, s.interface as sensor_interface,
+                   psv.type as passive_type, psv.value_primary, psv.package_case
             FROM parts p
-            JOIN mcu_specs m ON p.id = m.part_id
+            LEFT JOIN mcu_specs m ON p.id = m.part_id
+            LEFT JOIN ldo_specs l ON p.id = l.part_id
+            LEFT JOIN pmic_specs pm ON p.id = pm.part_id
+            LEFT JOIN can_specs c ON p.id = c.part_id
+            LEFT JOIN sensor_specs s ON p.id = s.part_id
+            LEFT JOIN passive_specs psv ON p.id = psv.part_id
             WHERE 1=1
         """
         params = []
         param_idx = 1
         
+        # 2. Text Search
         if request.query:
             query += f" AND (p.mpn ILIKE ${param_idx} OR p.family ILIKE ${param_idx})"
             params.append(f"%{request.query}%")
             param_idx += 1
             
+        # 3. MCU Specific Filters (Only apply if params provided)
         if request.flash_min_kb:
             query += f" AND m.flash_kb >= ${param_idx}"
             params.append(request.flash_min_kb)
@@ -395,14 +406,49 @@ async def search_parts(request: SearchRequest):
             params.append(request.io_count_min)
             param_idx += 1
             
-        query += f" ORDER BY m.cost_usd ASC NULLS LAST LIMIT ${param_idx}"
+        # Limit
+        query += f" ORDER BY p.mpn ASC LIMIT ${param_idx}"
         params.append(request.limit)
         
         rows = await conn.fetch(query, *params)
         
         results = []
         for row in rows:
-            results.append(dict(row))
+            r = dict(row)
+            # Normalize specs into a clean dict for UI
+            specs = {}
+            if r.get('core'): # MCU
+                specs = {k: r[k] for k in ['core', 'max_mhz', 'flash_kb', 'sram_kb'] if r.get(k) is not None}
+                specs['type_label'] = 'MCU'
+            elif r.get('ldo_vout'): # LDO
+                specs = {k: r[k] for k in ['ldo_vin_min', 'ldo_vout', 'ldo_iout'] if r.get(k) is not None}
+                specs['type_label'] = 'LDO'
+            elif r.get('buck_count') is not None: # PMIC
+                specs = {k: r[k] for k in ['buck_count', 'ldo_count'] if r.get(k) is not None}
+                specs['type_label'] = 'PMIC'
+            elif r.get('can_rate'): # CAN
+                specs = {'data_rate': r['can_rate']}
+                specs['type_label'] = 'CAN'
+            elif r.get('sensor_type'): # Sensor
+                specs = {'type': r['sensor_type'], 'interface': r['sensor_interface']}
+                specs['type_label'] = 'Sensor'
+            elif r.get('passive_type'): # Passive
+                specs = {'type': r['passive_type'], 'value': r['value_primary'], 'case': r['package_case']}
+                specs['type_label'] = 'Passive'
+            else:
+                specs['type_label'] = 'Component'
+                
+            # Clean up top level
+            entry = {
+                "id": str(r['id']),
+                "mpn": r['mpn'],
+                "manufacturer": r['manufacturer'],
+                "family": r['family'],
+                "datasheet_url": r['datasheet_url'],
+                "type_label": specs['type_label'],
+                "specs": specs
+            }
+            results.append(entry)
             
         return {"count": len(results), "results": results}
 
@@ -414,7 +460,9 @@ async def get_part_pins(part_id: str):
     """Get pin definitions for a part"""
     try:
         from solver.pin_mux_solver import PinMuxSolver
-        solver = PinMuxSolver(os.getenv("DATABASE_URL"))
+        if not db.pool:
+             raise HTTPException(status_code=503, detail="Database not initialized")
+        solver = PinMuxSolver(db.pool)
         pins = await solver.get_pin_functions(part_id)
         return pins
     except Exception as e:
@@ -431,7 +479,9 @@ async def solve_pin_mux(part_id: str, requirements: List[PinRequirementRequest])
     """Solve pin muxing for a part"""
     try:
         from solver.pin_mux_solver import PinMuxSolver, PinRequirement, PinType
-        solver = PinMuxSolver(os.getenv("DATABASE_URL"))
+        if not db.pool:
+             raise HTTPException(status_code=503, detail="Database not initialized")
+        solver = PinMuxSolver(db.pool)
         
         # Convert request to internal model
         reqs = []
@@ -463,7 +513,9 @@ async def calculate_power(part_id: str, request: PowerRequest):
     try:
         from solver.power_budget_calculator import PowerBudgetCalculator, ModeProfile, PowerMode
         # Basic mapping for MVP
-        calc = PowerBudgetCalculator(os.getenv("DATABASE_URL"))
+        if not db.pool:
+             raise HTTPException(status_code=503, detail="Database not initialized")
+        calc = PowerBudgetCalculator(db.pool)
         
         profiles = [
             ModeProfile(PowerMode.RUN, request.run_percent),
@@ -821,7 +873,7 @@ async def trigger_ingestion(background_tasks: BackgroundTasks):
         try:
             # Run the ingestion script as a subprocess to avoid blocking the event loop
             # and to handle the large memory usage of PDF processing
-            script_path = "ingestion/run_stm32_ingestion.py"
+            script_path = "scripts/run_pipeline.py"
             subprocess.run(["python", script_path], check=True)
             logger.info("Ingestion process completed successfully")
         except subprocess.CalledProcessError as e:

@@ -34,77 +34,129 @@ class HardFilter:
     ) -> List[Dict[str, Any]]:
         """
         Filter parts by hard constraints.
-        
-        CRITICAL: Zero tolerance - any constraint violation excludes the part.
-        
-        Args:
-            spec: Requirement specification
-        
-        Returns:
-            List of parts satisfying ALL hard constraints
+        Supports polymorphic component types (mcu, ldo, pmic, etc).
         """
-        logger.info("Applying hard filter")
+        # Determine component type from constraints (injected by LLM or user)
+        c_type = spec.hard_constraints.get('component_type', 'mcu').lower()
+        logger.info(f"Applying hard filter for component_type: {c_type}")
         
-        # Compile constraints to SQL
+        # Compile constraints
         where_clause, params = self.compiler.compile(spec)
         
-        # Build query
-        query = f"""
-        SELECT 
-            p.id,
-            p.mpn,
-            p.manufacturer,
-            p.family,
-            p.status,
-            p.package_family,
-            p.package_name,
-            p.pin_count,
-            p.temp_min_c,
-            p.temp_max_c,
-            m.core,
-            m.max_mhz,
-            m.flash_kb,
-            m.sram_kb,
-            m.eeprom_kb,
-            m.can_count,
-            m.can_fd_count,
-            m.uart_count,
-            m.spi_count,
-            m.i2c_count,
-            m.usb_fs,
-            m.usb_hs,
-            m.ethernet,
-            m.adc_channels,
-            m.dac_channels,
-            m.timers_count,
-            m.pwm_channels,
-            m.has_fpu,
-            m.has_dsp,
-            m.has_crypto,
-            m.has_wireless,
-            m.vdd_min_v,
-            m.vdd_max_v,
-            m.active_ma,
-            m.standby_ua,
-            m.sleep_ua,
-            m.cost_usd,
-            m.extras
-        FROM parts p
-        JOIN mcu_specs m ON p.id = m.part_id
-        WHERE {where_clause}
-        ORDER BY p.mpn ASC  -- Deterministic ordering for tie-breaking
-        """
+        # Dispatch query builder
+        if c_type == 'mcu':
+            query = self._build_mcu_query(where_clause)
+        elif c_type == 'ldo':
+            query = self._build_ldo_query(where_clause)
+        elif c_type == 'pmic':
+            query = self._build_pmic_query(where_clause)
+        elif c_type == 'can':
+            query = self._build_can_query(where_clause)
+        elif c_type == 'sensor':
+            query = self._build_sensor_query(where_clause)
+        elif c_type == 'passive':
+            query = self._build_passive_query(where_clause)
+        else:
+             logger.warning(f"Unknown component type '{c_type}', defaulting to MCU")
+             query = self._build_mcu_query(where_clause)
         
-        # Execute query with positional parameters
+        # Execute
         async with self.db_pool.acquire() as conn:
             rows = await conn.fetch(query, *params)
         
         logger.info(f"Hard filter: {len(rows)} candidates found")
         
-        # Convert to dicts
-        candidates = [dict(row) for row in rows]
-        
+        # Hydrate candidates (nest specs for MLRanking)
+        candidates = []
+        for row in rows:
+            r = dict(row)
+            # Create nested specs dict if not present (MLRanking expects 'specs' key)
+            # We move all non-PartBase fields into 'specs'
+            part_keys = {'id', 'mpn', 'manufacturer', 'family', 'status', 'package_family', 'package_name', 'pin_count', 'temp_min_c', 'temp_max_c', 'datasheet_url'}
+            specs = {k: v for k, v in r.items() if k not in part_keys}
+            r['specs'] = specs
+            # Ensure cost_usd exists for ranking (default to 0 if missing)
+            if 'cost_usd' not in r:
+                r['cost_usd'] = 0.0
+            candidates.append(r)
+            
         return candidates
+
+    def _build_mcu_query(self, where_clause: str) -> str:
+        return f"""
+        SELECT 
+            p.id, p.mpn, p.manufacturer, p.family, p.status, p.package_family, p.package_name,
+            p.pin_count, p.temp_min_c, p.temp_max_c,
+            m.core, m.max_mhz, m.flash_kb, m.sram_kb, m.eeprom_kb,
+            m.can_count, m.uart_count, m.spi_count, m.i2c_count,
+            m.usb_fs, m.usb_hs, m.ethernet, m.adc_channels, m.dac_channels,
+            m.has_fpu, m.has_dsp, m.has_wireless, m.cost_usd
+        FROM parts p
+        JOIN mcu_specs m ON p.id = m.part_id
+        WHERE {where_clause}
+        ORDER BY p.mpn ASC
+        """
+
+    def _build_ldo_query(self, where_clause: str) -> str:
+        return f"""
+        SELECT 
+            p.id, p.mpn, p.manufacturer, p.family, p.status, p.package_family, p.package_name,
+            l.vin_min_v, l.vin_max_v, l.vout_type, l.vout_fixed_v, l.vout_min_v, l.vout_max_v,
+            l.iout_max_ma, l.dropout_voltage_v, l.psrr_db, l.noise_uv_rms
+        FROM parts p
+        JOIN ldo_specs l ON p.id = l.part_id
+        WHERE {where_clause}
+        ORDER BY p.mpn ASC
+        """
+
+    def _build_pmic_query(self, where_clause: str) -> str:
+        return f"""
+        SELECT 
+            p.id, p.mpn, p.manufacturer, p.family, p.status, p.package_family,
+            pm.input_voltage_min_v, pm.input_voltage_max_v,
+            pm.buck_count, pm.ldo_count, pm.boost_count,
+            pm.automotive_grade, pm.interfaces
+        FROM parts p
+        JOIN pmic_specs pm ON p.id = pm.part_id
+        WHERE {where_clause}
+        ORDER BY p.mpn ASC
+        """
+
+    def _build_can_query(self, where_clause: str) -> str:
+        return f"""
+        SELECT 
+            p.id, p.mpn, p.manufacturer, p.family, p.status, p.package_family,
+            c.data_rate_mbps, c.supply_voltage_v, c.has_standby_mode,
+            c.protection_features
+        FROM parts p
+        JOIN can_specs c ON p.id = c.part_id
+        WHERE {where_clause}
+        ORDER BY p.mpn ASC
+        """
+
+    def _build_sensor_query(self, where_clause: str) -> str:
+        return f"""
+        SELECT 
+            p.id, p.mpn, p.manufacturer, p.family, p.status, p.package_family,
+            s.sensor_type, s.interface, s.supply_voltage_min_v, s.supply_voltage_max_v,
+            s.resolution_bits
+        FROM parts p
+        JOIN sensor_specs s ON p.id = s.part_id
+        WHERE {where_clause}
+        ORDER BY p.mpn ASC
+        """
+
+    def _build_passive_query(self, where_clause: str) -> str:
+        return f"""
+        SELECT 
+            p.id, p.mpn, p.manufacturer, p.family, p.status, p.package_family,
+            psv.type, psv.value_primary, psv.tolerance_percent,
+            psv.power_rating_w, psv.voltage_rating_v, psv.package_case
+        FROM parts p
+        JOIN passive_specs psv ON p.id = psv.part_id
+        WHERE {where_clause}
+        ORDER BY p.mpn ASC
+        """
     
     async def count_total_parts(self) -> int:
         """Count total parts in database"""
