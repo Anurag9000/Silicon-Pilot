@@ -26,14 +26,17 @@ This script will:
 
 ## 📖 Documentation
 
-*   **[Architecture & Design](architecture.md)**: Detailed breakdown of the system flow, data ingestion logic, and component diagrams.
+*   **[Features & Capabilities](features.md)**: Exhaustive list of all supported components and system features.
+*   **[System Workflow](system_workflow.md)**: Detailed step-by-step explanation of ingestion and runtime flows.
+*   **[Architecture & Design](architecture.md)**: High-level system design and component breakdown.
 *   **[Remaining Tasks](remaining.md)**: Roadmap of pending features and known gaps.
 *   **[API Documentation](http://localhost:8000/docs)**: Swagger UI (once server is running).
 
 ## 🛠️ Components
 
 ### Ingestion Engine (`ingestion/`)
-*   `stm32_mcu_ingester.py`: Seeds the database with known part numbers.
+*   `stm32_mcu_ingester.py`: Seeds the database with known MCU part numbers.
+*   `st_pmic_ingester.py`, `st_can_ingester.py`, etc.: Specialized seeders for other components.
 *   `run_full_ingestion.py`: The main workhorse. Downloads PDFs and runs the `STM32DatasheetExtractor`.
 *   `stm32_errata_ingester.py`: Fetches Errata sheets.
 

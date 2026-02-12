@@ -1,7 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from llm_agent import LLMAgent, ExtractiveFallback, CitationSummary
-from Searching import SearchHit
+from llm_agent import LLMAgent, ExtractiveFallback, CitationSummary, SearchHit
 
 class TestLLMAgent:
     @pytest.fixture

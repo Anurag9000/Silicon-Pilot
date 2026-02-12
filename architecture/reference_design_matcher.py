@@ -36,16 +36,14 @@ class ReferenceDesignMatch:
 class ReferenceDesignMatcher:
     """Match user requirements to reference designs"""
     
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.db_pool = db_pool
     
     async def find_by_mcu(self, mcu_id: uuid.UUID, max_results: int = 5) -> List[ReferenceDesignMatch]:
         """
         Find reference designs using the same or similar MCU
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             # Get MCU details
             mcu = await conn.fetchrow("""
                 SELECT p.mpn, p.manufacturer, m.core, m.flash_kb, m.sram_kb
@@ -101,18 +99,13 @@ class ReferenceDesignMatcher:
                 ))
             
             return matches
-            
-        finally:
-            await conn.close()
     
     async def find_by_application(self, application_area: str, 
                                   max_results: int = 10) -> List[ReferenceDesignMatch]:
         """
         Find reference designs for a specific application area
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             designs = await conn.fetch("""
                 SELECT * FROM reference_designs
                 WHERE application_area ILIKE $1
@@ -153,18 +146,13 @@ class ReferenceDesignMatcher:
                 ))
             
             return matches
-            
-        finally:
-            await conn.close()
     
     async def find_by_manufacturer(self, manufacturer: str,
                                    max_results: int = 10) -> List[ReferenceDesignMatch]:
         """
         Find reference designs from a specific manufacturer
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             designs = await conn.fetch("""
                 SELECT * FROM reference_designs
                 WHERE manufacturer ILIKE $1
@@ -204,9 +192,6 @@ class ReferenceDesignMatcher:
                 ))
             
             return matches
-            
-        finally:
-            await conn.close()
     
     async def add_reference_design(self, design_name: str, manufacturer: str,
                                   application_area: str, description: str,
@@ -216,9 +201,7 @@ class ReferenceDesignMatcher:
         """
         Add a new reference design to the database
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             design_id = await conn.fetchval("""
                 INSERT INTO reference_designs (
                     design_name, manufacturer, application_area, description,
@@ -229,9 +212,6 @@ class ReferenceDesignMatcher:
                 schematic_url, bom_url, documentation_url)
             
             return design_id
-            
-        finally:
-            await conn.close()
     
     async def add_design_part(self, design_id: uuid.UUID, part_id: uuid.UUID,
                              reference_designator: str, quantity: int = 1,
@@ -239,9 +219,7 @@ class ReferenceDesignMatcher:
         """
         Add a part to a reference design BOM
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             part_entry_id = await conn.fetchval("""
                 INSERT INTO reference_design_parts (
                     design_id, part_id, reference_designator, quantity, is_critical
@@ -250,18 +228,15 @@ class ReferenceDesignMatcher:
             """, design_id, part_id, reference_designator, quantity, is_critical)
             
             return part_entry_id
-            
-        finally:
-            await conn.close()
 
     async def find_similar_designs(self, mcu_id: uuid.UUID, 
                                  user_application: Optional[str] = None,
                                  limit: int = 5) -> List[ReferenceDesignMatch]:
         """
         Find reference designs with fuzzy matching (MCU family, App, Components)
+        Optimized to use single SQL Query with aggregation.
         """
-        conn = await asyncpg.connect(self.db_url)
-        try:
+        async with self.db_pool.acquire() as conn:
             # 1. Get Target MCU Details
             target_mcu = await conn.fetchrow("""
                 SELECT p.mpn, p.manufacturer, p.family, m.core, m.flash_kb, m.sram_kb
@@ -272,85 +247,104 @@ class ReferenceDesignMatcher:
             
             if not target_mcu:
                 return []
+            
+            user_app_query = f"%{user_application}%" if user_application else ""
 
-            # 2. Fetch ALL candidate designs (optimize later with filtering if needed)
-            # We fetch designs that have *some* MCU or related application
-            candidates = await conn.fetch("""
-                SELECT rd.*, 
-                       m.part_id as mcu_id, mp.mpn as mcu_mpn, mp.family, ms.core
-                FROM reference_designs rd
-                JOIN reference_design_parts m ON rd.id = m.design_id
-                JOIN parts mp ON m.part_id = mp.id
-                JOIN mcu_specs ms ON mp.id = ms.part_id
-                WHERE m.is_critical = TRUE
-            """)
-            
-            scored_matches = []
-            
-            for cand in candidates:
-                score = 0.0
-                reasons = []
-                
-                # --- MCU Scoring (Max 50) ---
-                if cand['mcu_mpn'] == target_mcu['mpn']:
-                    score += 50
-                    reasons.append("Exact MCU Match (+50)")
-                elif cand['family'] == target_mcu['family']:
-                    score += 40
-                    reasons.append(f"Same Family ({cand['family']}) (+40)")
-                elif cand['core'] == target_mcu['core']:
-                    score += 20
-                    reasons.append(f"Same Core ({cand['core']}) (+20)")
-                
-                # --- Application Scoring (Max 30) ---
-                if user_application and cand['application_area']:
-                    if user_application.lower() in cand['application_area'].lower():
-                        score += 30
-                        reasons.append(f"Application Match ({user_application}) (+30)")
-                
-                # --- Component/Complexity (Max 20) ---
-                # Placeholder for BOM overlap, for now just small boost if fully documented
-                if cand['schematic_url'] and cand['bom_url']:
-                    score += 20
-                    reasons.append("Full Documentation Available (+20)")
-                
-                # Threshold
-                if score > 0:
-                    # Fetch key parts for display
-                    key_parts = await conn.fetch("""
-                        SELECT p.mpn, p.manufacturer, p.family as category, rdp.reference_designator
-                        FROM reference_design_parts rdp
-                        JOIN parts p ON rdp.part_id = p.id
-                        WHERE rdp.design_id = $1 AND rdp.is_critical = TRUE
+            # 2. Optimized Query: Fetch Candidates + Scores + Key Parts in one go
+            # Using LATERAL or Subquery to get top key parts as JSON
+            query = """
+                WITH scored_designs AS (
+                    SELECT 
+                        rd.id, rd.design_name, rd.design_id as design_code, 
+                        rd.manufacturer, rd.application_area, rd.description,
+                        rd.schematic_url, rd.bom_url, rd.documentation_url,
+                        
+                        -- MCU Score
+                        (CASE 
+                            WHEN mp.mpn = $2 THEN 50 
+                            WHEN mp.family = $3 THEN 40 
+                            WHEN ms.core = $4 THEN 20 
+                            ELSE 0 
+                        END) as mcu_score,
+                        
+                        -- App Score
+                        (CASE 
+                            WHEN $5::text <> '' AND rd.application_area ILIKE $5 THEN 30 
+                            ELSE 0 
+                        END) as app_score,
+                        
+                        -- Doc Score
+                        (CASE 
+                            WHEN rd.schematic_url IS NOT NULL AND rd.bom_url IS NOT NULL THEN 20 
+                            ELSE 0 
+                        END) as doc_score
+                        
+                    FROM reference_designs rd
+                    JOIN reference_design_parts rdp ON rd.id = rdp.design_id
+                    JOIN parts mp ON rdp.part_id = mp.id
+                    JOIN mcu_specs ms ON mp.id = ms.part_id
+                    WHERE rdp.is_critical = TRUE
+                )
+                SELECT 
+                    sd.*,
+                    (sd.mcu_score + sd.app_score + sd.doc_score) as total_score,
+                    (
+                        SELECT json_agg(json_build_object(
+                            'mpn', kp.mpn,
+                            'manufacturer', kp.manufacturer,
+                            'category', kp.family,
+                            'designator', krdp.reference_designator
+                        ))
+                        FROM reference_design_parts krdp
+                        JOIN parts kp ON krdp.part_id = kp.id
+                        WHERE krdp.design_id = sd.id AND krdp.is_critical = TRUE
                         LIMIT 5
-                    """, cand['id'])
-
-                    scored_matches.append(ReferenceDesignMatch(
-                        design_id=cand['id'],
-                        design_name=cand['design_name'],
-                        design_code=cand['design_id'] or '',
-                        manufacturer=cand['manufacturer'],
-                        application_area=cand['application_area'] or 'General',
-                        description=cand['description'] or '',
-                        match_score=score,
-                        match_reasons=reasons,
-                        schematic_url=cand['schematic_url'],
-                        bom_url=cand['bom_url'],
-                        documentation_url=cand['documentation_url'],
-                        key_parts=[{
-                            'mpn': p['mpn'],
-                            'manufacturer': p['manufacturer'],
-                            'category': p['category'],
-                            'designator': p['reference_designator']
-                        } for p in key_parts]
-                    ))
+                    ) as key_parts_json
+                FROM scored_designs sd
+                WHERE (sd.mcu_score + sd.app_score + sd.doc_score) > 0
+                ORDER BY total_score DESC
+                LIMIT $6
+            """
             
-            # Sort by score DESC
-            scored_matches.sort(key=lambda x: x.match_score, reverse=True)
-            return scored_matches[:limit]
+            rows = await conn.fetch(query, 
+                                  mcu_id, 
+                                  target_mcu['mpn'], 
+                                  target_mcu['family'], 
+                                  target_mcu['core'], 
+                                  user_app_query, 
+                                  limit)
             
-        finally:
-            await conn.close()
+            results = []
+            import json
+            
+            for row in rows:
+                reasons = []
+                if row['mcu_score'] >= 50: reasons.append("Exact MCU Match")
+                elif row['mcu_score'] >= 40: reasons.append("Same Family Match")
+                elif row['mcu_score'] >= 20: reasons.append("Same Core Match")
+                
+                if row['app_score'] > 0: reasons.append(f"Application Match ({user_application})")
+                if row['doc_score'] > 0: reasons.append("Fully Documented")
+                
+                # Parse key parts from JSON
+                key_parts_data = json.loads(row['key_parts_json']) if row['key_parts_json'] else []
+                
+                results.append(ReferenceDesignMatch(
+                    design_id=row['id'],
+                    design_name=row['design_name'],
+                    design_code=row['design_code'] or '',
+                    manufacturer=row['manufacturer'],
+                    application_area=row['application_area'] or 'General',
+                    description=row['description'] or '',
+                    match_score=float(row['total_score']),
+                    match_reasons=reasons,
+                    schematic_url=row['schematic_url'],
+                    bom_url=row['bom_url'],
+                    documentation_url=row['documentation_url'],
+                    key_parts=key_parts_data
+                ))
+            
+            return results
 
 
 # Example usage

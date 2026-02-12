@@ -72,31 +72,15 @@ class PinConflict:
 class PinMuxSolver:
     """Solve pin muxing constraints"""
     
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+    
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.db_pool = db_pool
     
     async def get_pin_functions(self, part_id: uuid.UUID) -> Dict[str, Dict[str, Any]]:
         """
         Get all pin functions for an MCU
-        
-        Returns:
-            {
-                "PA0": {
-                    "pin_number": 1,
-                    "functions": {
-                        0: "GPIO",
-                        1: "USART2_CTS",
-                        2: "TIM2_CH1",
-                        ...
-                    },
-                    "has_adc": True,
-                    ...
-                }
-            }
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             pins = await conn.fetch("""
                 SELECT * FROM mcu_pin_functions
                 WHERE part_id = $1
@@ -124,24 +108,16 @@ class PinMuxSolver:
                 }
             
             return pin_map
-            
-        finally:
-            await conn.close()
     
     async def get_constraints(self, part_id: uuid.UUID) -> List[Dict[str, Any]]:
         """Get pin muxing constraints"""
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             constraints = await conn.fetch("""
                 SELECT * FROM pin_mux_constraints
                 WHERE part_id = $1
             """, part_id)
             
             return [dict(c) for c in constraints]
-            
-        finally:
-            await conn.close()
     
     def find_pins_for_function(self, pin_map: Dict[str, Dict[str, Any]], 
                                function_name: str) -> List[Tuple[str, int]]:
@@ -188,14 +164,6 @@ class PinMuxSolver:
                    requirements: List[PinRequirement]) -> Dict[str, Any]:
         """
         Solve pin muxing for given requirements
-        
-        Returns:
-            {
-                'success': bool,
-                'assignments': Dict[str, PinAssignment],
-                'conflicts': List[PinConflict],
-                'unassigned': List[str]
-            }
         """
         # Get pin functions
         pin_map = await self.get_pin_functions(part_id)
@@ -210,7 +178,7 @@ class PinMuxSolver:
             }
         
         # Get constraints
-        constraints = await self.get_constraints(part_id)
+        # constraints = await self.get_constraints(part_id) # Unused for now
         
         assignments = {}
         unassigned = []
@@ -273,8 +241,6 @@ class PinMuxSolver:
                                   assignments: Dict[str, PinAssignment]) -> List[str]:
         """
         Validate electrical constraints
-        
-        Returns list of warnings
         """
         warnings = []
         pin_map = await self.get_pin_functions(part_id)
@@ -326,35 +292,13 @@ async def main():
     import os
     
     db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
-    solver = PinMuxSolver(db_url)
+    pool = await asyncpg.create_pool(db_url)
+    solver = PinMuxSolver(pool)
     
-    # Example: Solve pin mux for UART + SPI + I2C
-    # requirements = [
-    #     PinRequirement(PinType.UART, "USART1_TX", required=True),
-    #     PinRequirement(PinType.UART, "USART1_RX", required=True),
-    #     PinRequirement(PinType.SPI, "SPI1_MOSI", required=True),
-    #     PinRequirement(PinType.SPI, "SPI1_MISO", required=True),
-    #     PinRequirement(PinType.SPI, "SPI1_SCK", required=True),
-    #     PinRequirement(PinType.I2C, "I2C1_SDA", required=True),
-    #     PinRequirement(PinType.I2C, "I2C1_SCL", required=True),
-    # ]
-    # 
-    # result = await solver.solve(part_id, requirements)
-    # 
-    # if result['success']:
-    #     print("✓ Pin mux solved successfully!")
-    #     for func, assignment in result['assignments'].items():
-    #         print(f"  {func}: {assignment.pin_name} (AF{assignment.alternate_function})")
-    # else:
-    #     print("✗ Pin mux failed")
-    #     if result['conflicts']:
-    #         print("\nConflicts:")
-    #         for conflict in result['conflicts']:
-    #             print(f"  {conflict.pin_name}: {', '.join(conflict.conflicting_functions)}")
-    #     if result['unassigned']:
-    #         print("\nUnassigned:")
-    #         for func in result['unassigned']:
-    #             print(f"  {func}")
+    # ... example usage would need real part_id ...
+    print("PinMuxSolver initialized with pool")
+    
+    await pool.close()
 
 
 if __name__ == "__main__":

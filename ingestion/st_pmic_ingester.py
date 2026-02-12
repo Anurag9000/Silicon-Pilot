@@ -1,106 +1,121 @@
 
-import asyncio
-import asyncpg
-import logging
-import sys
-import os
+"""
+Ingester for STMicroelectronics PMICs
+"""
 
-# Setup logging
+import asyncio
+import logging
+import asyncpg
+import os
+import re
+from typing import List, Dict, Optional
+from datetime import datetime
+import uuid
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
-
-# ST PMIC Families
-ST_PMIC_FAMILIES = {
-    # MPU Power Management
+# Target families
+PMIC_FAMILIES = {
     "STPMIC1": {
-        "buck_count": 4,
-        "ldo_count": 6,
-        "boost_count": 1,
-        "vin_range": [2.8, 5.5],
-        "interface": "I2C",
-        "automotive": False,
-        "variants": [
-            {"series": "STPMIC1", "package": ["APQR", "BPQR"]} # WFQFN 44
-        ]
+        "description": "Power Management IC for STM32MP1",
+        "url": "https://www.st.com/en/power-management/stpmic1.html",
+        "datasheet": "https://www.st.com/resource/en/datasheet/stpmic1.pdf",
+        "specs": {
+            "input_voltage_min_v": 2.8,
+            "input_voltage_max_v": 5.5,
+            "output_count": 14,
+            "buck_count": 4,
+            "ldo_count": 6,
+            "boost_count": 1,
+            "control_interface": ["I2C"],
+            "automotive_grade": True
+        }
     },
-    # Automotive Power Management
     "L4995": {
-        "buck_count": 0,
-        "ldo_count": 1, # 5V Regulator
-        "boost_count": 0,
-        "vin_range": [5.6, 31],
-        "interface": "None",
-        "automotive": True,
-        "watchdog": True,
-        "variants": [
-            {"series": "L4995", "package": ["J", "K"]} # PowerSSO-12
-        ]
+        "description": "Automotive 5V Low Drop Voltage Regulator with Watchdog",
+        "url": "https://www.st.com/en/automotive-analog-and-power/l4995.html",
+        "datasheet": "https://www.st.com/resource/en/datasheet/l4995.pdf",
+        "specs": {
+            "input_voltage_min_v": 5.6,
+            "input_voltage_max_v": 31.0,
+            "output_count": 1,
+            "ldo_count": 1,
+            "control_interface": [],
+            "automotive_grade": True
+        }
     }
 }
 
-async def seed_pmic_parts(conn: asyncpg.Connection):
-    total_new = 0
-    
-    for family, data in ST_PMIC_FAMILIES.items():
-        logger.info(f"Processing family: {family}")
+class PMICIngester:
+    def __init__(self, db_pool):
+        self.db_pool = db_pool
+
+    async def ingest_family(self, family_name: str, data: dict):
+        """Ingest a PMIC family and its specs"""
+        logger.info(f"Ingesting family: {family_name}")
         
-        buck_count = data["buck_count"]
-        ldo_count = data["ldo_count"]
-        boost_count = data["boost_count"]
-        vin_min, vin_max = data["vin_range"]
-        interface = data["interface"]
-        automotive = data.get("automotive", False)
-        watchdog = data.get("watchdog", False)
-        
-        for variant in data["variants"]:
-            series = variant["series"]
-            for pkg in variant["package"]:
-                # Generate MPN
-                mpn = f"{series}{pkg}"
-                
-                # Check/Insert Part
-                part_id = await conn.fetchval("""
-                    INSERT INTO parts (mpn, manufacturer, family, datasheet_url)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (mpn) DO UPDATE 
-                    SET updated_at = NOW()
-                    RETURNING id
-                """, mpn, "STMicroelectronics", family, 
-                     f"https://www.st.com/resource/en/datasheet/{series.lower()}.pdf")
-                
-                # Insert PMIC Specs
+        async with self.db_pool.acquire() as conn:
+            # 1. Insert into parts table
+            # For PMICs, the family name is often the root part number
+            mpn = family_name 
+            
+            # Check if exists
+            part_id = await conn.fetchval("SELECT id FROM parts WHERE mpn = $1", mpn)
+            
+            if not part_id:
+                part_id = uuid.uuid4()
                 await conn.execute("""
-                    INSERT INTO pmic_specs (
-                        part_id, 
-                        buck_count, ldo_count, boost_count,
-                        has_buck, has_ldo, has_boost,
-                        vin_min_v, vin_max_v,
-                        interface_type, is_automotive, has_watchdog
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                    ON CONFLICT (part_id) DO UPDATE
-                    SET buck_count = EXCLUDED.buck_count
-                """, part_id, 
-                     buck_count, ldo_count, boost_count,
-                     buck_count > 0, ldo_count > 0, boost_count > 0,
-                     vin_min, vin_max,
-                     interface, automotive, watchdog)
-                
-                total_new += 1
-                
-    logger.info(f"Seeding complete. Processed {total_new} PMIC variants.")
-    return total_new
+                    INSERT INTO parts (id, mpn, manufacturer, family, description, datasheet_url, status)
+                    VALUES ($1, $2, 'STMicroelectronics', $3, $4, $5, 'active')
+                """, part_id, mpn, family_name, data['description'], data['datasheet'])
+                logger.info(f"Created new part: {mpn}")
+            else:
+                logger.info(f"Updating existing part: {mpn}")
+                await conn.execute("""
+                    UPDATE parts SET description = $2, datasheet_url = $3
+                    WHERE id = $1
+                """, part_id, data['description'], data['datasheet'])
+            
+            # 2. Insert into pmic_specs
+            specs = data['specs']
+            await conn.execute("""
+                INSERT INTO pmic_specs (
+                    part_id, input_voltage_min_v, input_voltage_max_v, 
+                    output_count, buck_count, ldo_count, boost_count,
+                    control_interface, automotive_grade
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (part_id) DO UPDATE SET
+                    input_voltage_min_v = EXCLUDED.input_voltage_min_v,
+                    input_voltage_max_v = EXCLUDED.input_voltage_max_v,
+                    output_count = EXCLUDED.output_count,
+                    buck_count = EXCLUDED.buck_count,
+                    ldo_count = EXCLUDED.ldo_count,
+                    boost_count = EXCLUDED.boost_count,
+                    control_interface = EXCLUDED.control_interface,
+                    automotive_grade = EXCLUDED.automotive_grade
+            """, part_id, 
+               specs.get('input_voltage_min_v'), specs.get('input_voltage_max_v'),
+               specs.get('output_count'), specs.get('buck_count', 0), 
+               specs.get('ldo_count', 0), specs.get('boost_count', 0),
+               specs.get('control_interface', []), specs.get('automotive_grade', False)
+            )
+
+    async def run(self):
+        """Run ingestion for all defined families"""
+        for family, data in PMIC_FAMILIES.items():
+            await self.ingest_family(family, data)
 
 async def main():
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    pool = await asyncpg.create_pool(db_url)
+    
     try:
-        conn = await asyncpg.connect(DB_URL)
-        await seed_pmic_parts(conn)
-        await conn.close()
-    except Exception as e:
-        logger.error(f"Failed: {e}")
+        ingester = PMICIngester(pool)
+        await ingester.run()
+    finally:
+        await pool.close()
 
 if __name__ == "__main__":
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())

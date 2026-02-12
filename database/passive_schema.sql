@@ -1,35 +1,18 @@
 
--- PASSIVE COMPONENT SPECIFICATIONS
--- Resistors, Capacitors, Inductors (Generic)
+-- Passive Component Specifications Table
+DROP TABLE IF EXISTS passive_specs CASCADE;
 
 CREATE TABLE IF NOT EXISTS passive_specs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
-    
-    -- Type
-    component_type VARCHAR(20) NOT NULL, -- 'Resistor', 'Capacitor', 'Inductor'
-    
-    -- Value
-    value_primary DECIMAL(18,9) NOT NULL, -- Ohms, Farads, Henries (Base units)
-    value_formatted VARCHAR(20), -- '10k', '100nF' (For display)
-    
-    -- Specs
-    tolerance_percent DECIMAL(5,2), -- e.g. 1.0, 5.0, 20.0
-    power_rating_w DECIMAL(8,3), -- Resistors
-    voltage_rating_v DECIMAL(8,2), -- Capacitors
-    dielectric_type VARCHAR(20), -- X7R, C0G (Caps)
-    
-    -- Package
-    package_case VARCHAR(20), -- '0402', '0603', '0805'
-    
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    part_id UUID PRIMARY KEY REFERENCES parts(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL, -- Resistor, Capacitor, Inductor
+    value_primary NUMERIC(15, 6), -- Ohms, Farads, Henries
+    tolerance_percent NUMERIC(5, 2),
+    power_rating_w NUMERIC(6, 3), -- for resistors
+    voltage_rating_v NUMERIC(6, 2), -- for capacitors
+    package_case VARCHAR(50), -- 0402, 0603, etc.
+    dielectric_type VARCHAR(50) -- X7R, C0G, etc. (for caps)
 );
 
-CREATE INDEX IF NOT EXISTS idx_passive_type ON passive_specs(component_type);
-CREATE INDEX IF NOT EXISTS idx_passive_value ON passive_specs(value_primary);
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_passive_type_val ON passive_specs(type, value_primary);
 CREATE INDEX IF NOT EXISTS idx_passive_package ON passive_specs(package_case);
-
--- Trigger
-CREATE TRIGGER update_passive_specs_updated_at BEFORE UPDATE ON passive_specs
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

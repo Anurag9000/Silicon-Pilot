@@ -34,6 +34,14 @@ from solver import HardFilter, RankingEngine, NearMissEngine
 from llm import LLMOrchestrator
 from questions import QuestionEngine
 
+# web_ui imports
+from templates.template_system import TemplateLoader
+from llm.intent_classifier import IntentParser, TemplateMatcher
+from architecture.compiler import ArchitectureBuilder, ConstraintCompiler
+from architecture.enhanced_exports import ExportManager
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
+
 # Configure logging
 logging.basicConfig(
     level=os.getenv('LOG_LEVEL', 'INFO'),
@@ -49,6 +57,10 @@ ranking_engine: Optional[RankingEngine] = None
 near_miss_engine: Optional[NearMissEngine] = None
 llm_orchestrator: Optional[LLMOrchestrator] = None
 question_engine: Optional[QuestionEngine] = None
+
+# web_ui globals
+template_loader: Optional[TemplateLoader] = None
+templates: Optional[Jinja2Templates] = None
 
 # Background tasks
 from fastapi import BackgroundTasks
@@ -87,6 +99,12 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Failed to initialize Question Engine: {e}")
         question_engine = None
     
+    # Initialize web_ui components
+    global template_loader, templates
+    templates_dir = Path(__file__).parent / "web_ui" / "templates"
+    templates = Jinja2Templates(directory=str(templates_dir))
+    template_loader = TemplateLoader(str(templates_dir))
+    
     logger.info("All components initialized")
     
     yield
@@ -122,12 +140,195 @@ if static_dir.exists():
 # ==================== Frontend Routes ====================
 
 @app.get("/", response_class=HTMLResponse)
-async def serve_index():
+async def serve_index(request: Request):
     """Serve the main frontend application"""
+    # Use Jinja2 template if available, otherwise fallback
+    if templates:
+        return templates.TemplateResponse("index.html", {"request": request})
+        
     index_path = Path(__file__).parent / "web_ui" / "templates" / "index.html"
     if index_path.exists():
         return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
     return HTMLResponse(content="<h1>Frontend not found</h1>", status_code=404)
+
+# ==================== Web UI API ====================
+
+@app.post("/api/parse-intent")
+async def parse_intent(request: Request):
+    """Parse user intent"""
+    data = await request.json()
+    user_input = data.get("input", "")
+    
+    parser = IntentParser(use_llm=False)
+    intent = parser.parse_intent(user_input)
+    
+    matcher = TemplateMatcher(template_loader)
+    matches = matcher.match_templates(intent)
+    
+    return {
+        "intent": {
+            "device_type": intent.device_type,
+            "keywords": intent.keywords,
+            "extracted_params": intent.extracted_params
+        },
+        "matches": [
+            {
+                "template_id": m.template_id,
+                "confidence": m.confidence,
+                "match_reason": m.match_reason
+            }
+            for m in matches[:5]
+        ]
+    }
+
+
+@app.get("/api/templates")
+async def list_templates():
+    """List all available templates"""
+    templates_list = template_loader.load_all_templates()
+    
+    return {
+        "templates": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "device_type": t.device_type,
+                "description": t.description,
+                "tags": t.tags
+            }
+            for t in templates_list
+        ]
+    }
+
+
+@app.get("/api/templates/{template_id}")
+async def get_template(template_id: str):
+    """Get template details"""
+    template = template_loader.load_template(template_id)
+    
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    return {
+        "id": template.id,
+        "name": template.name,
+        "description": template.description,
+        "device_type": template.device_type,
+        "subsystems": list(template.subsystems.keys()),
+        "questions": [
+            {
+                "id": q.id,
+                "text": q.text,
+                "type": q.type,
+                "choices": q.choices if hasattr(q, 'choices') else None,
+                "default": q.default if hasattr(q, 'default') else None,
+                "priority": q.priority,
+                "help_text": q.help_text if hasattr(q, 'help_text') else None
+            }
+            for q in template.questions
+        ]
+    }
+
+@app.post("/api/build-architecture")
+async def build_architecture(request: Request):
+    """Build architecture from template and answers"""
+    data = await request.json()
+    template_id = data.get("template_id")
+    answers = data.get("answers", {})
+    
+    template = template_loader.load_template(template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    builder = ArchitectureBuilder()
+    architecture = builder.build_architecture(template, answers)
+    
+    compiler = ConstraintCompiler()
+    # req_spec = compiler.compile_constraints(architecture) # unused in frontend for now
+    
+    # Simulate component recommendations
+    bom = [
+        {
+            "category": "MCU",
+            "manufacturer": "STMicroelectronics",
+            "mpn": "STM32F405RGT6",
+            "description": "ARM Cortex-M4, 168MHz, 1MB Flash",
+            "quantity": 1,
+            "price_usd": 5.50
+        }
+    ]
+    
+    return {
+        "architecture": {
+            "subsystems": list(architecture.subsystems.keys()),
+            "subsystem_details": {
+                name: {
+                    "functions": list(subsys.functions),
+                    "constraints": subsys.constraints
+                }
+                for name, subsys in architecture.subsystems.items()
+            }
+        },
+        "bom": bom,
+        "total_cost": sum(item["price_usd"] * item["quantity"] for item in bom)
+    }
+
+
+@app.post("/api/export")
+async def export_design(request: Request):
+    """Export design to various formats"""
+    data = await request.json()
+    format_type = data.get("format", "pdf")
+    bom = data.get("bom", [])
+    config = data.get("config", {})
+    project_name = data.get("project_name", "design")
+    
+    export_manager = ExportManager()
+    output_dir = Path(__file__).parent / "exports"
+    output_dir.mkdir(exist_ok=True)
+    
+    try:
+        if format_type == "eagle":
+            content = export_manager.eagle.export(bom, project_name)
+            filename = f"{project_name}_eagle.xml"
+        elif format_type == "kicad":
+            content = export_manager.kicad.export(bom)
+            filename = f"{project_name}_kicad.csv"
+        elif format_type == "altium":
+            content = export_manager.altium.export(bom)
+            filename = f"{project_name}_altium.csv"
+        elif format_type == "pdf":
+            content = export_manager.pdf.export(bom, config, project_name)
+            filename = f"{project_name}_report.pdf"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid format")
+        
+        # Save file
+        output_path = output_dir / filename
+        if isinstance(content, bytes):
+            output_path.write_bytes(content)
+        else:
+            output_path.write_text(content)
+        
+        return {
+            "success": True,
+            "filename": filename,
+            "download_url": f"/downloads/{filename}"
+        }
+    except Exception as e:
+        logger.error(f"Export failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/downloads/{filename}")
+async def download_file(filename: str):
+    """Download exported file"""
+    file_path = Path(__file__).parent / "exports" / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(file_path, filename=filename)
 
 # Helper for Pydantic models
 from pydantic import BaseModel

@@ -1,98 +1,116 @@
 
-import asyncio
-import asyncpg
-import logging
-import sys
-import os
+"""
+Ingester for STMicroelectronics CAN Transceivers
+"""
 
-# Setup logging
+import asyncio
+import logging
+import asyncpg
+import os
+import uuid
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
-
-# ST CAN Families
-ST_CAN_FAMILIES = {
-    # High Speed CAN
+# Target families
+CAN_FAMILIES = {
     "L9616": {
-        "rate_mbps": 1.0,
-        "protocol": "CAN",
-        "vin_range": [4.75, 5.25],
-        "standby": False,
-        "esd_kv": 4.0,
-        "variants": [
-            {"series": "L9616", "package": ["D", "K"]} # SO-8
-        ]
+        "description": "High Speed CAN Bus Transceiver",
+        "url": "https://www.st.com/en/automotive-analog-and-power/l9616.html",
+        "datasheet": "https://www.st.com/resource/en/datasheet/l9616.pdf",
+        "specs": {
+            "data_rate_mbps": 1.0,
+            "supply_voltage_min_v": 4.5,
+            "supply_voltage_max_v": 5.5,
+            "has_standby_mode": False,
+            "has_wakeup_mode": False,
+            "protection_esd_kv": 4.0,
+            "automotive_grade": True,
+            "package_type": "SO-8"
+        }
     },
-    # Dual Channel / FD Ready
     "L9966": {
-        "rate_mbps": 5.0, # FD
-        "protocol": "CAN-FD",
-        "vin_range": [3.0, 5.25], # 3.3V/5V compatible
-        "standby": True,
-        "esd_kv": 8.0,
-        "variants": [
-            {"series": "L9966", "package": ["TR"]} # PowerSSO-12
-        ]
+        "description": "Automotive Multi-Channel CAN Transceiver",
+        "url": "https://www.st.com/en/automotive-analog-and-power/l9966.html",
+        "datasheet": "https://www.st.com/resource/en/datasheet/l9966.pdf",
+        "specs": {
+            "data_rate_mbps": 5.0, # CAN FD capable
+            "supply_voltage_min_v": 3.0, # 3.3V compatible
+            "supply_voltage_max_v": 5.5,
+            "has_standby_mode": True,
+            "has_wakeup_mode": True,
+            "protection_esd_kv": 8.0,
+            "automotive_grade": True,
+            "package_type": "QFN-48"
+        }
     }
 }
 
-async def seed_can_parts(conn: asyncpg.Connection):
-    total_new = 0
-    
-    for family, data in ST_CAN_FAMILIES.items():
-        logger.info(f"Processing family: {family}")
+class CANIngester:
+    def __init__(self, db_pool):
+        self.db_pool = db_pool
+
+    async def ingest_family(self, family_name: str, data: dict):
+        """Ingest a CAN family and its specs"""
+        logger.info(f"Ingesting family: {family_name}")
         
-        rate = data["rate_mbps"]
-        protocol = data["protocol"]
-        vin_min, vin_max = data["vin_range"]
-        standby = data.get("standby", False)
-        esd = data.get("esd_kv", 2.0)
-        
-        for variant in data["variants"]:
-            series = variant["series"]
-            for pkg in variant["package"]:
-                mpn = f"{series}{pkg}"
-                
-                # Check/Insert Part
-                part_id = await conn.fetchval("""
-                    INSERT INTO parts (mpn, manufacturer, family, datasheet_url)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (mpn) DO UPDATE 
-                    SET updated_at = NOW()
-                    RETURNING id
-                """, mpn, "STMicroelectronics", family, 
-                     f"https://www.st.com/resource/en/datasheet/{series.lower()}.pdf")
-                
-                # Insert CAN Specs
+        async with self.db_pool.acquire() as conn:
+            mpn = family_name 
+            
+            # 1. Upsert Part
+            part_id = await conn.fetchval("SELECT id FROM parts WHERE mpn = $1", mpn)
+            
+            if not part_id:
+                part_id = uuid.uuid4()
                 await conn.execute("""
-                    INSERT INTO can_specs (
-                        part_id, 
-                        max_data_rate_mbps, protocol_type,
-                        supply_voltage_min_v, supply_voltage_max_v,
-                        has_standby_mode, esd_protection_kv
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                    ON CONFLICT (part_id) DO UPDATE
-                    SET max_data_rate_mbps = EXCLUDED.max_data_rate_mbps
-                """, part_id, 
-                     rate, protocol,
-                     vin_min, vin_max,
-                     standby, esd)
-                
-                total_new += 1
-                
-    logger.info(f"Seeding complete. Processed {total_new} CAN variants.")
-    return total_new
+                    INSERT INTO parts (id, mpn, manufacturer, family, description, datasheet_url, status)
+                    VALUES ($1, $2, 'STMicroelectronics', $3, $4, $5, 'active')
+                """, part_id, mpn, family_name, data['description'], data['datasheet'])
+                logger.info(f"Created new part: {mpn}")
+            else:
+                logger.info(f"Updating existing part: {mpn}")
+                await conn.execute("""
+                    UPDATE parts SET description = $2, datasheet_url = $3
+                    WHERE id = $1
+                """, part_id, data['description'], data['datasheet'])
+            
+            # 2. Upsert Specs
+            specs = data['specs']
+            await conn.execute("""
+                INSERT INTO can_specs (
+                    part_id, data_rate_mbps, supply_voltage_min_v, supply_voltage_max_v,
+                    has_standby_mode, has_wakeup_mode, protection_esd_kv, 
+                    automotive_grade, package_type
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                ON CONFLICT (part_id) DO UPDATE SET
+                    data_rate_mbps = EXCLUDED.data_rate_mbps,
+                    supply_voltage_min_v = EXCLUDED.supply_voltage_min_v,
+                    supply_voltage_max_v = EXCLUDED.supply_voltage_max_v,
+                    has_standby_mode = EXCLUDED.has_standby_mode,
+                    has_wakeup_mode = EXCLUDED.has_wakeup_mode,
+                    protection_esd_kv = EXCLUDED.protection_esd_kv,
+                    automotive_grade = EXCLUDED.automotive_grade,
+                    package_type = EXCLUDED.package_type
+            """, part_id, 
+               specs.get('data_rate_mbps'), specs.get('supply_voltage_min_v'), specs.get('supply_voltage_max_v'),
+               specs.get('has_standby_mode'), specs.get('has_wakeup_mode'),
+               specs.get('protection_esd_kv'), specs.get('automotive_grade'),
+               specs.get('package_type')
+            )
+
+    async def run(self):
+        for family, data in CAN_FAMILIES.items():
+            await self.ingest_family(family, data)
 
 async def main():
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    pool = await asyncpg.create_pool(db_url)
     try:
-        conn = await asyncpg.connect(DB_URL)
-        await seed_can_parts(conn)
-        await conn.close()
-    except Exception as e:
-        logger.error(f"Failed: {e}")
+        ingester = CANIngester(pool)
+        await ingester.run()
+    finally:
+        await pool.close()
 
 if __name__ == "__main__":
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())

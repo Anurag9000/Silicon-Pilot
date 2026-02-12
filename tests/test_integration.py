@@ -36,10 +36,10 @@ class IntegrationTests:
     def assert_true(self, condition: bool, message: str):
         """Assert condition is true"""
         if condition:
-            print(f"  ✓ {message}")
+            print(f"  [OK] {message}")
             self.passed += 1
         else:
-            print(f"  ✗ {message}")
+            print(f"  [FAIL] {message}")
             self.failed += 1
     
     async def test_alternative_suggester(self):

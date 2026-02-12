@@ -1,91 +1,126 @@
 
-import asyncio
-import asyncpg
-import logging
-import sys
-import os
+"""
+Ingester for Passive Components (Resistors, Capacitors)
+"""
 
-# Setup logging
+import asyncio
+import logging
+import asyncpg
+import os
+import uuid
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
-
-# Essential "Golden" Passives for Reference Designs
-# We treat these as "Generic" or use placeholders for Manufacturer
-ESSENTIAL_PASSIVES = [
-    # Resistors (1%)
-    {"mpn": "R0402-10K", "type": "Resistor", "val": 10000.0, "fmt": "10k", "pkg": "0402", "tol": 1.0, "pwr": 0.063},
-    {"mpn": "R0402-100K", "type": "Resistor", "val": 100000.0, "fmt": "100k", "pkg": "0402", "tol": 1.0, "pwr": 0.063},
-    {"mpn": "R0603-1K", "type": "Resistor", "val": 1000.0, "fmt": "1k", "pkg": "0603", "tol": 1.0, "pwr": 0.1},
-    {"mpn": "R0603-0R", "type": "Resistor", "val": 0.0, "fmt": "0R", "pkg": "0603", "tol": 0.0, "pwr": 0.1},
-    
-    # Capacitors (MLCC)
-    {"mpn": "C0402-100nF", "type": "Capacitor", "val": 1e-7, "fmt": "100nF", "pkg": "0402", "vol": 16.0, "diel": "X7R"},
-    {"mpn": "C0603-1uF", "type": "Capacitor", "val": 1e-6, "fmt": "1uF", "pkg": "0603", "vol": 16.0, "diel": "X7R"},
-    {"mpn": "C0603-10uF", "type": "Capacitor", "val": 1e-5, "fmt": "10uF", "pkg": "0603", "vol": 6.3, "diel": "X5R"},
-    {"mpn": "C0402-22pF", "type": "Capacitor", "val": 2.2e-11, "fmt": "22pF", "pkg": "0402", "vol": 50.0, "diel": "C0G"},
+# Seed Data (Generic parts for reference designs)
+PASSIVE_PARTS = [
+    {
+        "mpn": "GEN-RES-10K-0402-1%",
+        "manufacturer": "Generic",
+        "family": "Resistor",
+        "description": "Resistor 10k Ohm 1% 1/16W 0402",
+        "datasheet": "",
+        "specs": {
+            "type": "Resistor",
+            "value_primary": 10000.0,
+            "tolerance_percent": 1.0,
+            "power_rating_w": 0.0625,
+            "package_case": "0402"
+        }
+    },
+    {
+        "mpn": "GEN-CAP-100NF-0402-16V",
+        "manufacturer": "Generic",
+        "family": "Capacitor",
+        "description": "Capacitor 100nF 16V X7R 0402",
+        "datasheet": "",
+        "specs": {
+            "type": "Capacitor",
+            "value_primary": 100e-9,
+            "tolerance_percent": 10.0,
+            "voltage_rating_v": 16.0,
+            "package_case": "0402",
+            "dielectric_type": "X7R"
+        }
+    },
+    {
+        "mpn": "GEN-CAP-10UF-0603-10V",
+        "manufacturer": "Generic",
+        "family": "Capacitor",
+        "description": "Capacitor 10uF 10V X5R 0603",
+        "datasheet": "",
+        "specs": {
+            "type": "Capacitor",
+            "value_primary": 10e-6,
+            "tolerance_percent": 20.0,
+            "voltage_rating_v": 10.0,
+            "package_case": "0603",
+            "dielectric_type": "X5R"
+        }
+    }
 ]
 
-async def seed_passive_parts(conn: asyncpg.Connection):
-    total_new = 0
-    
-    logger.info(f"Seeding {len(ESSENTIAL_PASSIVES)} essential passive components...")
-    
-    for p in ESSENTIAL_PASSIVES:
-        mpn = p["mpn"]
-        p_type = p["type"]
-        val = p["val"]
-        fmt = p["fmt"]
-        pkg = p["pkg"]
+class PassiveIngester:
+    def __init__(self, db_pool):
+        self.db_pool = db_pool
+
+    async def ingest_part(self, data: dict):
+        """Ingest a passive part"""
+        mpn = data['mpn']
+        logger.info(f"Ingesting passive: {mpn}")
         
-        # Determine manufacturer (Generic)
-        mfr = "Generic" 
-        
-        # Check/Insert Part
-        part_id = await conn.fetchval("""
-            INSERT INTO parts (mpn, manufacturer, family, datasheet_url)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (mpn) DO UPDATE 
-            SET updated_at = NOW()
-            RETURNING id
-        """, mpn, mfr, p_type, "https://www.digikey.com") # Placeholder URL
-        
-        # Insert Specs
-        if p_type == "Resistor":
+        async with self.db_pool.acquire() as conn:
+            # 1. Upsert Part
+            part_id = await conn.fetchval("SELECT id FROM parts WHERE mpn = $1", mpn)
+            
+            if not part_id:
+                part_id = uuid.uuid4()
+                await conn.execute("""
+                    INSERT INTO parts (id, mpn, manufacturer, family, description, datasheet_url, status)
+                    VALUES ($1, $2, $3, $4, $5, $6, 'active')
+                """, part_id, mpn, data['manufacturer'], data['family'], data['description'], data['datasheet'])
+                logger.info(f"Created new part: {mpn}")
+            else:
+                logger.info(f"Updating existing part: {mpn}")
+                await conn.execute("""
+                    UPDATE parts SET description = $2, datasheet_url = $3
+                    WHERE id = $1
+                """, part_id, data['description'], data['datasheet'])
+            
+            # 2. Upsert Specs
+            specs = data['specs']
             await conn.execute("""
                 INSERT INTO passive_specs (
-                    part_id, component_type, value_primary, value_formatted,
-                    tolerance_percent, power_rating_w, package_case
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT (part_id) DO UPDATE
-                SET value_primary = EXCLUDED.value_primary
-            """, part_id, p_type, val, fmt, p["tol"], p["pwr"], pkg)
-            
-        elif p_type == "Capacitor":
-             await conn.execute("""
-                INSERT INTO passive_specs (
-                    part_id, component_type, value_primary, value_formatted,
-                    voltage_rating_v, dielectric_type, package_case
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-                ON CONFLICT (part_id) DO UPDATE
-                SET value_primary = EXCLUDED.value_primary
-            """, part_id, p_type, val, fmt, p["vol"], p["diel"], pkg)
-            
-        total_new += 1
-                
-    logger.info(f"Seeding complete. Processed {total_new} Passive parts.")
-    return total_new
+                    part_id, type, value_primary, tolerance_percent, 
+                    power_rating_w, voltage_rating_v, package_case, dielectric_type
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                ON CONFLICT (part_id) DO UPDATE SET
+                    type = EXCLUDED.type,
+                    value_primary = EXCLUDED.value_primary,
+                    tolerance_percent = EXCLUDED.tolerance_percent,
+                    power_rating_w = EXCLUDED.power_rating_w,
+                    voltage_rating_v = EXCLUDED.voltage_rating_v,
+                    package_case = EXCLUDED.package_case,
+                    dielectric_type = EXCLUDED.dielectric_type
+            """, part_id, 
+               specs.get('type'), specs.get('value_primary'), specs.get('tolerance_percent'),
+               specs.get('power_rating_w'), specs.get('voltage_rating_v'),
+               specs.get('package_case'), specs.get('dielectric_type')
+            )
+
+    async def run(self):
+        for part in PASSIVE_PARTS:
+            await self.ingest_part(part)
 
 async def main():
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    pool = await asyncpg.create_pool(db_url)
     try:
-        conn = await asyncpg.connect(DB_URL)
-        await seed_passive_parts(conn)
-        await conn.close()
-    except Exception as e:
-        logger.error(f"Failed: {e}")
+        ingester = PassiveIngester(pool)
+        await ingester.run()
+    finally:
+        await pool.close()
 
 if __name__ == "__main__":
-    if sys.platform == 'win32':
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())

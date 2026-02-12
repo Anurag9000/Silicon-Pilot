@@ -35,8 +35,8 @@ class Violation:
 class DesignRuleChecker:
     """Check hardware designs against validation rules"""
     
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.db_pool = db_pool
     
     # ==================== PERSISTENCE ====================
     
@@ -466,9 +466,7 @@ class DesignRuleChecker:
         if not design_id:
             design_id = uuid.uuid4()
             
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             all_violations: List[Violation] = []
             
             # Power
@@ -481,9 +479,6 @@ class DesignRuleChecker:
             all_violations.extend(await self.check_crystal_load_cap(conn, design_id, design_parts))
 
             # Constraints (Memory/Thermal)
-            # Hardcoded requirements for now (or pass via args eventually)
-            # Constraints (Memory/Thermal)
-            # Hardcoded requirements for now (or pass via args eventually)
             all_violations.extend(await self.check_memory_constraints(conn, design_id, design_parts, 32, 4))
             all_violations.extend(await self.check_temperature_limits(conn, design_id, design_parts, ambient_temp_c))
             
@@ -502,9 +497,6 @@ class DesignRuleChecker:
                 'violations': all_violations,
                 'summary': summary
             }
-            
-        finally:
-            await conn.close()
 
 # CLI Test
 async def main():
@@ -512,8 +504,10 @@ async def main():
     import sys
     
     db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
-    checker = DesignRuleChecker(db_url)
+    pool = await asyncpg.create_pool(db_url)
+    checker = DesignRuleChecker(pool)
     print("DRC Engine Initialized.")
+    await pool.close()
 
 if __name__ == "__main__":
     if sys.platform == 'win32':
