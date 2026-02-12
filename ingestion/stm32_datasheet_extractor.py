@@ -270,17 +270,21 @@ class STM32DatasheetExtractor:
         await conn.execute("DELETE FROM mcu_pin_functions WHERE part_id = $1", part_id)
         
         for p in pins:
-            # Safely handle list to string conversion
-            af_str = ",".join(p['af_functions']) if p['af_functions'] else None
-            
-            # Parse pin number from name (e.g. PA0 -> 0, PB12 -> 12)
-            pin_num_match = re.search(r'\d+', p['pin_name'])
-            pin_num = int(pin_num_match.group()) if pin_num_match else 0
+            # Distribute AFs into af0_function...af15_function
+            afs = p['af_functions'] if p['af_functions'] else []
+            # Pad with None up to 16
+            af_cols = afs[:16] + [None] * (16 - len(afs[:16]))
             
             await conn.execute("""
-                INSERT INTO mcu_pin_functions (part_id, pin_number, pin_name, af0_function)
-                VALUES ($1, $2, $3, $4)
-            """, part_id, pin_num, p['pin_name'], af_str)
+                INSERT INTO mcu_pin_functions (
+                    part_id, pin_number, pin_name, 
+                    af0_function, af1_function, af2_function, af3_function,
+                    af4_function, af5_function, af6_function, af7_function,
+                    af8_function, af9_function, af10_function, af11_function,
+                    af12_function, af13_function, af14_function, af15_function
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            """, part_id, pin_num, p['pin_name'], *af_cols)
             
         # Save Power
         power = self.extract_power_modes()

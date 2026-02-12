@@ -58,6 +58,22 @@ def main():
     if not run_script("ingestion/st_dcdc_ingester.py", "DC-DC Part Seeding"):
         return
 
+    # 3c. PMIC Ingestion (Seed PMIC)
+    if not run_script("ingestion/st_pmic_ingester.py", "PMIC Part Seeding"):
+        return
+
+    # 3d. CAN Ingestion (Seed CAN)
+    if not run_script("ingestion/st_can_ingester.py", "CAN Transceiver Seeding"):
+        return
+
+    # 3e. Sensor Ingestion (Seed Sensors)
+    if not run_script("ingestion/st_sensor_ingester.py", "Sensor Part Seeding"):
+        return
+
+    # 3f. Passive Ingestion (Seed Resistors/Caps)
+    if not run_script("ingestion/st_passive_ingester.py", "Passive Part Seeding"):
+        return
+
     # 4. Full PDF Extraction (Download + Parse Details)
     # Note: This takes a long time. We'll run a limited batch by default for demonstration.
     if not run_script("ingestion/run_full_ingestion.py", "Datasheet Extraction (Batch)"):

@@ -48,7 +48,7 @@ class ReferenceDesignMatcher:
         try:
             # Get MCU details
             mcu = await conn.fetchrow("""
-                SELECT p.mpn, p.manufacturer, m.core, m.flash_kb, m.ram_kb
+                SELECT p.mpn, p.manufacturer, m.core, m.flash_kb, m.sram_kb
                 FROM parts p
                 JOIN mcu_specs m ON p.id = m.part_id
                 WHERE p.id = $1
@@ -73,7 +73,7 @@ class ReferenceDesignMatcher:
             for design in exact_matches:
                 # Get key parts for this design
                 key_parts = await conn.fetch("""
-                    SELECT p.mpn, p.manufacturer, p.category, rdp.reference_designator
+                    SELECT p.mpn, p.manufacturer, p.family as category, rdp.reference_designator
                     FROM reference_design_parts rdp
                     JOIN parts p ON rdp.part_id = p.id
                     WHERE rdp.design_id = $1 AND rdp.is_critical = TRUE
@@ -125,7 +125,7 @@ class ReferenceDesignMatcher:
             for design in designs:
                 # Get key parts
                 key_parts = await conn.fetch("""
-                    SELECT p.mpn, p.manufacturer, p.category, rdp.reference_designator
+                    SELECT p.mpn, p.manufacturer, p.family as category, rdp.reference_designator
                     FROM reference_design_parts rdp
                     JOIN parts p ON rdp.part_id = p.id
                     WHERE rdp.design_id = $1 AND rdp.is_critical = TRUE
@@ -176,7 +176,7 @@ class ReferenceDesignMatcher:
             
             for design in designs:
                 key_parts = await conn.fetch("""
-                    SELECT p.mpn, p.manufacturer, p.category, rdp.reference_designator
+                    SELECT p.mpn, p.manufacturer, p.family as category, rdp.reference_designator
                     FROM reference_design_parts rdp
                     JOIN parts p ON rdp.part_id = p.id
                     WHERE rdp.design_id = $1 AND rdp.is_critical = TRUE
@@ -250,6 +250,104 @@ class ReferenceDesignMatcher:
             """, design_id, part_id, reference_designator, quantity, is_critical)
             
             return part_entry_id
+            
+        finally:
+            await conn.close()
+
+    async def find_similar_designs(self, mcu_id: uuid.UUID, 
+                                 user_application: Optional[str] = None,
+                                 limit: int = 5) -> List[ReferenceDesignMatch]:
+        """
+        Find reference designs with fuzzy matching (MCU family, App, Components)
+        """
+        conn = await asyncpg.connect(self.db_url)
+        try:
+            # 1. Get Target MCU Details
+            target_mcu = await conn.fetchrow("""
+                SELECT p.mpn, p.manufacturer, p.family, m.core, m.flash_kb, m.sram_kb
+                FROM parts p
+                JOIN mcu_specs m ON p.id = m.part_id
+                WHERE p.id = $1
+            """, mcu_id)
+            
+            if not target_mcu:
+                return []
+
+            # 2. Fetch ALL candidate designs (optimize later with filtering if needed)
+            # We fetch designs that have *some* MCU or related application
+            candidates = await conn.fetch("""
+                SELECT rd.*, 
+                       m.part_id as mcu_id, mp.mpn as mcu_mpn, mp.family, ms.core
+                FROM reference_designs rd
+                JOIN reference_design_parts m ON rd.id = m.design_id
+                JOIN parts mp ON m.part_id = mp.id
+                JOIN mcu_specs ms ON mp.id = ms.part_id
+                WHERE m.is_critical = TRUE
+            """)
+            
+            scored_matches = []
+            
+            for cand in candidates:
+                score = 0.0
+                reasons = []
+                
+                # --- MCU Scoring (Max 50) ---
+                if cand['mcu_mpn'] == target_mcu['mpn']:
+                    score += 50
+                    reasons.append("Exact MCU Match (+50)")
+                elif cand['family'] == target_mcu['family']:
+                    score += 40
+                    reasons.append(f"Same Family ({cand['family']}) (+40)")
+                elif cand['core'] == target_mcu['core']:
+                    score += 20
+                    reasons.append(f"Same Core ({cand['core']}) (+20)")
+                
+                # --- Application Scoring (Max 30) ---
+                if user_application and cand['application_area']:
+                    if user_application.lower() in cand['application_area'].lower():
+                        score += 30
+                        reasons.append(f"Application Match ({user_application}) (+30)")
+                
+                # --- Component/Complexity (Max 20) ---
+                # Placeholder for BOM overlap, for now just small boost if fully documented
+                if cand['schematic_url'] and cand['bom_url']:
+                    score += 20
+                    reasons.append("Full Documentation Available (+20)")
+                
+                # Threshold
+                if score > 0:
+                    # Fetch key parts for display
+                    key_parts = await conn.fetch("""
+                        SELECT p.mpn, p.manufacturer, p.family as category, rdp.reference_designator
+                        FROM reference_design_parts rdp
+                        JOIN parts p ON rdp.part_id = p.id
+                        WHERE rdp.design_id = $1 AND rdp.is_critical = TRUE
+                        LIMIT 5
+                    """, cand['id'])
+
+                    scored_matches.append(ReferenceDesignMatch(
+                        design_id=cand['id'],
+                        design_name=cand['design_name'],
+                        design_code=cand['design_id'] or '',
+                        manufacturer=cand['manufacturer'],
+                        application_area=cand['application_area'] or 'General',
+                        description=cand['description'] or '',
+                        match_score=score,
+                        match_reasons=reasons,
+                        schematic_url=cand['schematic_url'],
+                        bom_url=cand['bom_url'],
+                        documentation_url=cand['documentation_url'],
+                        key_parts=[{
+                            'mpn': p['mpn'],
+                            'manufacturer': p['manufacturer'],
+                            'category': p['category'],
+                            'designator': p['reference_designator']
+                        } for p in key_parts]
+                    ))
+            
+            # Sort by score DESC
+            scored_matches.sort(key=lambda x: x.match_score, reverse=True)
+            return scored_matches[:limit]
             
         finally:
             await conn.close()

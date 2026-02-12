@@ -70,6 +70,21 @@ def debug_db():
         
         cur.execute("SELECT COUNT(*) FROM part_pricing")
         print(f"Pricing Rows: {cur.fetchone()[0]}")
+        
+        cur.execute("SELECT COUNT(*) FROM pmic_specs")
+        print(f"PMIC Specs: {cur.fetchone()[0]}")
+        
+        cur.execute("SELECT COUNT(*) FROM can_specs")
+        print(f"CAN Specs: {cur.fetchone()[0]}")
+        
+        cur.execute("SELECT COUNT(*) FROM sensor_specs")
+        print(f"Sensor Specs: {cur.fetchone()[0]}")
+        
+        cur.execute("SELECT COUNT(*) FROM passive_specs")
+        print(f"Passive Specs: {cur.fetchone()[0]}")
+        
+        cur.execute("SELECT COUNT(*) FROM mcu_specs WHERE can_count > 0")
+        print(f"MCUs with CAN: {cur.fetchone()[0]}")
 
 
         conn.close()

@@ -1,0 +1,46 @@
+[
+    {
+        "name": "Low Cost Motor Control",
+        "intent": "Control a BLDC motor with minimal BOM cost",
+        "requirements": {
+            "min_flash_kb": 32,
+            "min_sram_kb": 4,
+            "max_price_usd": 2.00,
+            "peripherals": [
+                "TIM1",
+                "ADC1",
+                "USART1"
+            ]
+        },
+        "expected_family": "STM32F0"
+    },
+    {
+        "name": "High Performance Gateway",
+        "intent": "IoT Gateway with Ethernet and Crypto",
+        "requirements": {
+            "min_flash_kb": 512,
+            "min_sram_kb": 128,
+            "core": "Cortex-M7",
+            "peripherals": [
+                "ETH",
+                "RNG",
+                "CRYP"
+            ]
+        },
+        "expected_family": "STM32H7"
+    },
+    {
+        "name": "Ultra Low Power Sensor Node",
+        "intent": "Battery powered temp sensor",
+        "requirements": {
+            "min_flash_kb": 64,
+            "max_active_current_ma": 5.0,
+            "max_sleep_current_ua": 2.0,
+            "peripherals": [
+                "I2C1",
+                "LPUART1"
+            ]
+        },
+        "expected_family": "STM32L4"
+    }
+]
