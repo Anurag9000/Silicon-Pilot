@@ -16,7 +16,9 @@ from pathlib import Path
 # Add repo root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 # ST LDO Families to Ingest
 # Format: {SeriesName: {PackageCode: PinCount}}

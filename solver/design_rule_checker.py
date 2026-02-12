@@ -295,7 +295,7 @@ class DesignRuleChecker:
                 JOIN passive_specs ps ON p.id = ps.part_id
                 WHERE p.id = ANY($1) 
                 AND ps.component_type = 'Resistor' 
-                AND ps.value_primary BETWEEN 115 AND 125
+                AND ps.resistance_ohm BETWEEN 115 AND 125
             )
         """, design_parts)
         
@@ -338,7 +338,7 @@ class DesignRuleChecker:
                 JOIN passive_specs ps ON p.id = ps.part_id
                 WHERE p.id = ANY($1) 
                 AND ps.component_type = 'Resistor' 
-                AND ps.value_primary BETWEEN 4600 AND 4800
+                AND ps.resistance_ohm BETWEEN 4600 AND 4800
             )
         """, design_parts)
         

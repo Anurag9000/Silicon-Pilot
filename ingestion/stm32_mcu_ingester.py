@@ -24,7 +24,9 @@ import uuid
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Database URL
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 
 # STM32 Family Specifications

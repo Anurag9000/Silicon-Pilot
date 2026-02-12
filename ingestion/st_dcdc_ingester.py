@@ -9,7 +9,9 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 # ST DC-DC Families (Buck/Boost)
 # Identifying popular families to seed

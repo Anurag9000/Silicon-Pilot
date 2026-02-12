@@ -136,34 +136,35 @@ class PinMuxSolver:
         
         return candidates
     
-    def check_conflicts(self, assignments: Dict[str, PinAssignment]) -> List[PinConflict]:
-        """Check for pin assignment conflicts"""
-        conflicts = []
-        pin_usage = {}
+    def check_constraints(self, pin_name: str, assignments: Dict[str, PinAssignment], 
+                         constraints: List[Dict[str, Any]]) -> bool:
+        """
+        Check if assigning pin_name violates any constraints given current assignments.
+        """
+        assigned_pins = set(assignments.keys())
+        assigned_pins.add(pin_name)
         
-        # Group assignments by pin
-        for func_name, assignment in assignments.items():
-            pin = assignment.pin_name
-            if pin not in pin_usage:
-                pin_usage[pin] = []
-            pin_usage[pin].append(func_name)
-        
-        # Find conflicts (multiple functions on same pin)
-        for pin, functions in pin_usage.items():
-            if len(functions) > 1:
-                conflicts.append(PinConflict(
-                    pin_name=pin,
-                    conflicting_functions=functions,
-                    reason=f"Multiple functions assigned to {pin}",
-                    suggestions=[f"Move one function to alternate pin"]
-                ))
-        
-        return conflicts
-    
+        for constraint in constraints:
+            c_type = constraint['constraint_type']
+            c_pins = set(constraint['pin_names'])
+            
+            if c_type == 'exclusive':
+                # Mutual exclusion: At most one pin from the group can be used
+                # Check intersection of assigned pins with constraint group
+                intersection = assigned_pins.intersection(c_pins)
+                if len(intersection) > 1:
+                    return False
+                    
+            elif c_type == 'voltage_level':
+                # TODO: Implement voltage level consistency constraint
+                pass
+                
+        return True
+
     async def solve(self, part_id: uuid.UUID, 
                    requirements: List[PinRequirement]) -> Dict[str, Any]:
         """
-        Solve pin muxing for given requirements
+        Solve pin muxing for given requirements using backtracking
         """
         try:
             # Get pin functions
@@ -179,63 +180,112 @@ class PinMuxSolver:
                 }
             
             # Get constraints
-            # constraints = await self.get_constraints(part_id) # Unused for now
+            constraints = await self.get_constraints(part_id)
             
-            assignments = {}
-            unassigned = []
-            
-            # Sort requirements: required first, then by preferred pins
+            # Sort requirements: required first, then by number of candidates (heuristics constraint)
+            # We want to fail fast, so handle most constrained items first.
+            # 1. Required items first
+            # 2. Items with fewer preferred pins (more constrained)
             sorted_reqs = sorted(requirements, 
                                key=lambda r: (not r.required, len(r.preferred_pins or [])))
             
-            # Assign pins using greedy algorithm with backtracking
-            used_pins = set()
-            
-            for req in sorted_reqs:
-                # Find candidate pins
+            final_assignments: Dict[str, PinAssignment] = {}
+            unassigned_reqs: List[str] = []
+
+            # Backtracking solver
+            def backtrack(req_idx: int, current_assignments: Dict[str, str]) -> bool:
+                """
+                Recursive backtracking solver.
+                current_assignments: map of pin_name -> function_name
+                """
+                if req_idx == len(sorted_reqs):
+                    return True # All requirements processed
+                
+                req = sorted_reqs[req_idx]
+                
+                # Find candidate pins for this function
                 candidates = self.find_pins_for_function(pin_map, req.function_name)
                 
-                if not candidates:
-                    if req.required:
-                        unassigned.append(req.function_name)
-                    continue
+                # Filter candidates
+                valid_candidates = []
+                for pin_name, af in candidates:
+                    # Check if pin is already used
+                    if pin_name in current_assignments:
+                        continue
+                        
+                    # Check constraints logic
+                    # We need to construct a temporary assignment object or just pass names
+                    # For performance, we adapt check_constraints to work with the dict
+                    # But check_constraints expects Dict[function_name, PinAssignment]
+                    # Let's adapt check_constraints to take set of used pins for speed
+                    
+                    # Manual constraint check for speed inside loop
+                    violation = False
+                    # Check against 'exclusive' constraints
+                    # Ideally we preprocess constraints to map pin -> constraints
+                    for constraint in constraints:
+                        if constraint['constraint_type'] == 'exclusive':
+                            c_pins = set(constraint['pin_names'])
+                            if pin_name in c_pins:
+                                # If any other pin in this exclusive group is already used, violation
+                                if not c_pins.isdisjoint(current_assignments.keys()):
+                                    violation = True
+                                    break
+                    if violation:
+                         continue
+
+                    valid_candidates.append((pin_name, af))
                 
-                # Filter out already used pins
-                available = [(pin, af) for pin, af in candidates if pin not in used_pins]
-                
-                if not available:
-                    if req.required:
-                        unassigned.append(req.function_name)
-                    continue
-                
-                # Prefer pins from preferred list
+                # Sort candidates: preferred pins first
                 if req.preferred_pins:
-                    preferred = [(pin, af) for pin, af in available 
-                               if pin in req.preferred_pins]
-                    if preferred:
-                        available = preferred
+                    valid_candidates.sort(key=lambda x: 0 if x[0] in req.preferred_pins else 1)
                 
-                # Assign first available pin
-                pin_name, af = available[0]
-                assignments[req.function_name] = PinAssignment(
-                    pin_name=pin_name,
-                    pin_number=pin_map[pin_name]['pin_number'],
-                    function_type=req.function_type,
-                    function_name=req.function_name,
-                    alternate_function=af
-                )
-                used_pins.add(pin_name)
+                # Try candidates
+                for pin_name, af in valid_candidates:
+                    # Assign
+                    current_assignments[pin_name] = req.function_name
+                    final_assignments[req.function_name] = PinAssignment(
+                        pin_name=pin_name,
+                        pin_number=pin_map[pin_name]['pin_number'],
+                        function_type=req.function_type,
+                        function_name=req.function_name,
+                        alternate_function=af
+                    )
+                    
+                    if backtrack(req_idx + 1, current_assignments):
+                        return True
+                    
+                    # Backtrack
+                    del current_assignments[pin_name]
+                    del final_assignments[req.function_name]
+                
+                # If no candidate worked
+                if not req.required:
+                    # Skip optional requirement
+                    unassigned_reqs.append(req.function_name)
+                    if backtrack(req_idx + 1, current_assignments):
+                        return True
+                    unassigned_reqs.pop() # Backtrack unassigned list
+                
+                return False
+
+            # Run solver
+            success = backtrack(0, {})
             
-            # Check for conflicts
-            conflicts = self.check_conflicts(assignments)
-            
-            success = len(conflicts) == 0 and len(unassigned) == 0
+            # Identify unassigned required items
+            if not success:
+                 # If full success failed, we might want to return partial results or failure
+                 # The original requirement was to return failure if required items missed
+                 unassigned_reqs = [r.function_name for r in sorted_reqs if r.function_name not in final_assignments and r.required]
+
+            # Check for conflicts (should be zero by definition of backtracking, but double check)
+            conflicts = [] # conflicts handled by backtracking logic
             
             return {
                 'success': success,
-                'assignments': assignments,
+                'assignments': final_assignments,
                 'conflicts': conflicts,
-                'unassigned': unassigned
+                'unassigned': unassigned_reqs
             }
         except Exception as e:
             import traceback

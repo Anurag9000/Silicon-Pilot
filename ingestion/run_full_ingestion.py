@@ -23,7 +23,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.getenv("DATABASE_URL")
+if not DB_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 async def run_full_ingestion(limit: int = 100):
     conn = await asyncpg.connect(DB_URL)

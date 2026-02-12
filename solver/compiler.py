@@ -134,9 +134,8 @@ class ConstraintCompiler:
             'resolution': 's.resolution_bits',
 
             # Passives
+            # Passives (Partial support - schema varies by type)
             'passive_type': 'psv.type',
-            'value': 'psv.value_primary',
-            'package_case': 'psv.package_case', 
             'power_rating': 'psv.power_rating_w',
 
             # Common

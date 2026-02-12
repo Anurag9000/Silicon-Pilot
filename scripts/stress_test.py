@@ -12,7 +12,7 @@ import sys
 # Add parent dir to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from solver.ml_ranking import RankingEngine
+from solver.heuristic_ranking import HeuristicRankingEngine
 
 def load_scenarios():
     with open("tests/golden_scenarios.json", "r") as f:
@@ -25,22 +25,22 @@ def mock_candidates():
         {
             "id": "1", "mpn": "STM32F030F4P6", "manufacturer": "ST", 
             "cost_usd": 0.85, "stock": 15000, 
-            "specs": {"flash_kb": 16, "sram_kb": 4, "core": "Cortex-M0"}
+            "specs": {"flash_kb": 16, "sram_kb": 4, "core": "Cortex-M0", "max_mhz": 48}
         },
         {
             "id": "2", "mpn": "STM32F405RGT6", "manufacturer": "ST", 
             "cost_usd": 6.50, "stock": 2000, 
-            "specs": {"flash_kb": 1024, "sram_kb": 192, "core": "Cortex-M4"}
+            "specs": {"flash_kb": 1024, "sram_kb": 192, "core": "Cortex-M4", "max_mhz": 168}
         },
         {
             "id": "3", "mpn": "STM32L476RGT6", "manufacturer": "ST", 
             "cost_usd": 4.20, "stock": 5000, 
-            "specs": {"flash_kb": 1024, "sram_kb": 128, "core": "Cortex-M4"}
+            "specs": {"flash_kb": 1024, "sram_kb": 128, "core": "Cortex-M4", "max_mhz": 80}
         },
         {
             "id": "4", "mpn": "STM32H743ZIT6", "manufacturer": "ST", 
             "cost_usd": 12.00, "stock": 500, 
-            "specs": {"flash_kb": 2048, "sram_kb": 1024, "core": "Cortex-M7"}
+            "specs": {"flash_kb": 2048, "sram_kb": 1024, "core": "Cortex-M7", "max_mhz": 400}
         }
     ]
 
@@ -48,7 +48,7 @@ def run_stress_test(iterations=100):
     print(f"Starting Stress Test ({iterations} iterations)...")
     scenarios = load_scenarios()
     candidates = mock_candidates()
-    engine = RankingEngine()
+    engine = HeuristicRankingEngine()
     
     start_time = time.time()
     

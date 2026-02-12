@@ -70,7 +70,8 @@ class AlternativeSuggester:
             # Get original part specs
             original = await conn.fetchrow("""
                 SELECT p.*, m.core, m.flash_kb, m.sram_kb, m.max_mhz,
-                       p.package_family, p.pin_count, m.voltage_min_v, m.voltage_max_v
+                       p.package_family, p.pin_count, m.voltage_min_v, m.voltage_max_v,
+                       m.cost_usd
                 FROM parts p
                 JOIN mcu_specs m ON p.id = m.part_id
                 WHERE p.id = $1
@@ -82,7 +83,8 @@ class AlternativeSuggester:
             # Find candidates
             candidates = await conn.fetch("""
                 SELECT p.*, m.core, m.flash_kb, m.sram_kb, m.max_mhz,
-                       p.package_family, p.pin_count, m.voltage_min_v, m.voltage_max_v
+                       p.package_family, p.pin_count, m.voltage_min_v, m.voltage_max_v,
+                       m.cost_usd
                 FROM parts p
                 JOIN mcu_specs m ON p.id = m.part_id
                 WHERE p.category = 'mcu'
@@ -117,12 +119,22 @@ class AlternativeSuggester:
                 if candidate['manufacturer'] != original['manufacturer']:
                     alt_type = AlternativeType.SECOND_SOURCE
                 
+                # Calculate cost difference
+                cost_diff_percent = None
+                if original['cost_usd'] and candidate['cost_usd']:
+                    cost_diff = candidate['cost_usd'] - original['cost_usd']
+                    cost_diff_percent = (cost_diff / original['cost_usd']) * 100
+                
                 # Calculate score (higher is better)
                 score = spec_match
                 if alt_type == AlternativeType.PIN_COMPATIBLE:
                     score += 20  # Bonus for pin compatibility
                 if candidate['manufacturer'] != original['manufacturer']:
                     score += 10  # Bonus for vendor diversity
+                
+                # Bonus for lower cost
+                if cost_diff_percent is not None and cost_diff_percent < 0:
+                     score += abs(cost_diff_percent) * 0.5 # 0.5 points per % cheaper
                 
                 # Build reason
                 reasons = []
@@ -136,6 +148,8 @@ class AlternativeSuggester:
                     reasons.append("Pin-compatible")
                 if candidate['manufacturer'] != original['manufacturer']:
                     reasons.append("Second source")
+                if cost_diff_percent is not None and cost_diff_percent < -5:
+                    reasons.append(f"{abs(cost_diff_percent):.1f}% Cheaper")
                 
                 reason = ", ".join(reasons) if reasons else "Similar specs"
                 
@@ -146,9 +160,9 @@ class AlternativeSuggester:
                     category=candidate['category'],
                     alternative_type=alt_type,
                     score=score,
-                    cost_difference_percent=None,  # TODO: Add pricing data
-                    availability_status="unknown",  # TODO: Add availability data
-                    lifecycle_status="active",
+                    cost_difference_percent=cost_diff_percent,
+                    availability_status=candidate['status'], # Use actual status
+                    lifecycle_status=candidate['status'],
                     spec_match_percent=spec_match,
                     reason=reason
                 ))
@@ -212,8 +226,8 @@ class AlternativeSuggester:
                     alternative_type=AlternativeType.FUNCTIONALLY_EQUIVALENT,
                     score=score,
                     cost_difference_percent=None,
-                    availability_status="unknown",
-                    lifecycle_status="active",
+                    availability_status=candidate['status'],
+                    lifecycle_status=candidate['status'],
                     spec_match_percent=spec_match,
                     reason=reason
                 ))

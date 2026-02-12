@@ -1,5 +1,5 @@
 """
-ML Ranking Engine
+Heuristic Ranking Engine
 
 Ranks component candidates based on multiple factors:
 - Price (cost efficiency)
@@ -11,7 +11,7 @@ Currently uses a weighted heuristic model, designed to be replaced by
 a trained XGBoost/LightGBM model as user interaction data accumulates.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 import math
 
@@ -24,9 +24,9 @@ class Candidate:
     stock_qty: int
     specs: Dict[str, Any]
     score: float = 0.0
-    rank_reasons: List[str] = None
+    rank_reasons: List[str] = field(default_factory=list)
 
-class RankingEngine:
+class HeuristicRankingEngine:
     def __init__(self, weights: Optional[Dict[str, float]] = None):
         # Default weights for heuristic model
         self.weights = weights or {
@@ -55,9 +55,6 @@ class RankingEngine:
         max_price = max(prices) if prices else 1.0
         min_price = min(prices) if prices else 0.0
         
-        stocks = [c.get('stock', 0) or 0 for c in candidates]
-        max_stock = max(stocks) if stocks else 1
-        
         for cand in candidates:
             score = 0.0
             reasons = []
@@ -66,16 +63,19 @@ class RankingEngine:
             price = cand.get('cost_usd', 0) or 0
             if price > 0:
                 # Normalize: 1.0 for cheapest, ~0.0 for most expensive
-                # Linear interpolation: (max - price) / (max - min)
                 if max_price > min_price:
                     price_score = (max_price - price) / (max_price - min_price)
                 else:
+                    # If all prices are the same (range is 0), score is 1.0 (neutral/good)
                     price_score = 1.0
                 
                 weighted_score = price_score * self.weights['price']
                 score += weighted_score
                 if price_score > 0.8:
                     reasons.append(f"Great Price (${price:.2f})")
+            else:
+                 # No price data - neutral score (0.5 normalized)
+                 score += 0.5 * self.weights['price']
             
             # --- 2. Availability Score (Higher is better) ---
             stock = cand.get('stock', 0) or 0
@@ -89,24 +89,41 @@ class RankingEngine:
                     reasons.append("High Availability")
             
             # --- 3. Technical Margin (Bonus for exceeding specs) ---
-            # Example: Requested 64KB Flash, Candidate has 128KB -> Bonus
-            # But not too much (cost ineffective)
-            tech_score = 0.0
+            # Iterate over relevant numeric specs
+            tech_scores = []
             specs = cand.get('specs', {})
-            req_flash = requirements.get('min_flash_kb')
-            cand_flash = specs.get('flash_kb')
             
-            if req_flash and cand_flash:
-                ratio = cand_flash / req_flash
+            # Mapping of requirement keys to spec keys
+            # requirement key -> spec key
+            metrics = {
+                'min_flash_kb': 'flash_kb',
+                'min_sram_kb': 'sram_kb',
+                'min_pin_count': 'pin_count',
+                'min_max_mhz': 'max_mhz'
+            }
+            
+            for req_key, spec_key in metrics.items():
+                req_val = requirements.get(req_key)
+                if not req_val:
+                    continue
+                    
+                cand_val = specs.get(spec_key)
+                if not cand_val:
+                    continue
+                
+                ratio = cand_val / req_val
                 if 1.0 <= ratio <= 2.0:
-                    tech_score = 1.0 # Perfect sweet spot
-                    reasons.append("Optimal Flash Size")
+                    tech_scores.append(1.0) # Optimal
                 elif ratio > 2.0:
-                    tech_score = 0.7 # Overkill
-                else:
-                    tech_score = 0.0 # Should be filtered out, but just in case
-            
-            score += tech_score * self.weights['technical_margin']
+                    tech_scores.append(0.7) # Overkill (diminishing returns)
+                elif ratio < 1.0:
+                     tech_scores.append(0.0) # Below spec (should be filtered but penalty here)
+
+            if tech_scores:
+                avg_tech_score = sum(tech_scores) / len(tech_scores)
+                score += avg_tech_score * self.weights['technical_margin']
+                if avg_tech_score > 0.8:
+                    reasons.append("Good Spec Margin")
             
             # --- 4. Documentation (Placeholder) ---
             # Assume 1.0 for now if datasheets exist
@@ -127,4 +144,5 @@ class RankingEngine:
         # Sort
         scored_candidates.sort(key=lambda x: x.score, reverse=True)
         return scored_candidates
+
 
