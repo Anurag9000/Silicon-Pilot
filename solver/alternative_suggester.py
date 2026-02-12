@@ -51,8 +51,8 @@ class Alternative:
 class AlternativeSuggester:
     """Suggest alternative parts"""
     
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+    def __init__(self, db_pool: asyncpg.Pool):
+        self.db_pool = db_pool
     
     async def find_mcu_alternatives(self, original_part_id: uuid.UUID,
                                    max_results: int = 5) -> List[Alternative]:
@@ -66,13 +66,11 @@ class AlternativeSuggester:
         - Same or more peripherals
         - Pin count compatible (same or more)
         """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             # Get original part specs
             original = await conn.fetchrow("""
-                SELECT p.*, m.core, m.flash_kb, m.ram_kb, m.max_freq_mhz,
-                       m.package, m.pin_count, m.voltage_min_v, m.voltage_max_v
+                SELECT p.*, m.core, m.flash_kb, m.sram_kb, m.max_mhz,
+                       p.package_family, p.pin_count, m.voltage_min_v, m.voltage_max_v
                 FROM parts p
                 JOIN mcu_specs m ON p.id = m.part_id
                 WHERE p.id = $1
@@ -83,21 +81,21 @@ class AlternativeSuggester:
             
             # Find candidates
             candidates = await conn.fetch("""
-                SELECT p.*, m.core, m.flash_kb, m.ram_kb, m.max_freq_mhz,
-                       m.package, m.pin_count, m.voltage_min_v, m.voltage_max_v
+                SELECT p.*, m.core, m.flash_kb, m.sram_kb, m.max_mhz,
+                       p.package_family, p.pin_count, m.voltage_min_v, m.voltage_max_v
                 FROM parts p
                 JOIN mcu_specs m ON p.id = m.part_id
                 WHERE p.category = 'mcu'
                   AND p.id != $1
                   AND p.status = 'active'
                   AND m.flash_kb >= $2 * 0.8  -- Within 20% tolerance
-                  AND m.ram_kb >= $3
-                  AND m.pin_count >= $4
+                  AND m.sram_kb >= $3
+                  AND p.pin_count >= $4
                 ORDER BY 
                     ABS(m.flash_kb - $2) ASC,
-                    ABS(m.ram_kb - $3) ASC
+                    ABS(m.sram_kb - $3) ASC
                 LIMIT 20
-            """, original_part_id, original['flash_kb'], original['ram_kb'], original['pin_count'])
+            """, original_part_id, original['flash_kb'], original['sram_kb'], original['pin_count'])
             
             alternatives = []
             
@@ -105,16 +103,16 @@ class AlternativeSuggester:
                 # Calculate spec match percentage
                 flash_match = min(100, (min(candidate['flash_kb'], original['flash_kb']) / 
                                        max(candidate['flash_kb'], original['flash_kb'])) * 100)
-                ram_match = min(100, (min(candidate['ram_kb'], original['ram_kb']) / 
-                                     max(candidate['ram_kb'], original['ram_kb'])) * 100)
-                freq_match = min(100, (min(candidate['max_freq_mhz'], original['max_freq_mhz']) / 
-                                      max(candidate['max_freq_mhz'], original['max_freq_mhz'])) * 100)
+                ram_match = min(100, (min(candidate['sram_kb'], original['sram_kb']) / 
+                                     max(candidate['sram_kb'], original['sram_kb'])) * 100)
+                freq_match = min(100, (min(candidate['max_mhz'], original['max_mhz']) / 
+                                      max(candidate['max_mhz'], original['max_mhz'])) * 100)
                 
                 spec_match = (flash_match + ram_match + freq_match) / 3
                 
                 # Determine alternative type
                 alt_type = AlternativeType.FUNCTIONALLY_EQUIVALENT
-                if candidate['package'] == original['package'] and candidate['pin_count'] == original['pin_count']:
+                if candidate['package_family'] == original['package_family'] and candidate['pin_count'] == original['pin_count']:
                     alt_type = AlternativeType.PIN_COMPATIBLE
                 if candidate['manufacturer'] != original['manufacturer']:
                     alt_type = AlternativeType.SECOND_SOURCE
@@ -130,10 +128,10 @@ class AlternativeSuggester:
                 reasons = []
                 if candidate['flash_kb'] > original['flash_kb']:
                     reasons.append(f"+{candidate['flash_kb'] - original['flash_kb']}KB Flash")
-                if candidate['ram_kb'] > original['ram_kb']:
-                    reasons.append(f"+{candidate['ram_kb'] - original['ram_kb']}KB RAM")
-                if candidate['max_freq_mhz'] > original['max_freq_mhz']:
-                    reasons.append(f"+{candidate['max_freq_mhz'] - original['max_freq_mhz']}MHz")
+                if candidate['sram_kb'] > original['sram_kb']:
+                    reasons.append(f"+{candidate['sram_kb'] - original['sram_kb']}KB RAM")
+                if candidate['max_mhz'] > original['max_mhz']:
+                    reasons.append(f"+{candidate['max_mhz'] - original['max_mhz']}MHz")
                 if alt_type == AlternativeType.PIN_COMPATIBLE:
                     reasons.append("Pin-compatible")
                 if candidate['manufacturer'] != original['manufacturer']:
@@ -158,16 +156,11 @@ class AlternativeSuggester:
             # Sort by score and return top N
             alternatives.sort(key=lambda x: x.score, reverse=True)
             return alternatives[:max_results]
-            
-        finally:
-            await conn.close()
     
     async def find_pmic_alternatives(self, original_part_id: uuid.UUID,
                                     max_results: int = 5) -> List[Alternative]:
         """Find alternative PMICs"""
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             # Get original PMIC specs
             original = await conn.fetchrow("""
                 SELECT p.*, pm.input_voltage_min_v, pm.input_voltage_max_v,
@@ -227,15 +220,10 @@ class AlternativeSuggester:
             
             alternatives.sort(key=lambda x: x.score, reverse=True)
             return alternatives[:max_results]
-            
-        finally:
-            await conn.close()
     
     async def find_alternatives(self, part_id: uuid.UUID, max_results: int = 5) -> List[Alternative]:
         """Find alternatives for any part category"""
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        async with self.db_pool.acquire() as conn:
             # Determine category
             category = await conn.fetchval("SELECT category FROM parts WHERE id = $1", part_id)
             
@@ -245,17 +233,16 @@ class AlternativeSuggester:
                 return await self.find_pmic_alternatives(part_id, max_results)
             else:
                 return []
-                
-        finally:
-            await conn.close()
 
 
 # Example usage
 async def main():
     import os
+    import asyncio 
     
     db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
-    suggester = AlternativeSuggester(db_url)
+    pool = await asyncpg.create_pool(db_url)
+    suggester = AlternativeSuggester(pool)
     
     # Example: Find alternatives for a part
     # part_id = uuid.UUID("...")  # Replace with actual part ID
@@ -268,6 +255,8 @@ async def main():
     #     print(f"  Match: {alt.spec_match_percent:.1f}%")
     #     print(f"  Reason: {alt.reason}")
     #     print()
+    
+    await pool.close()
 
 
 if __name__ == "__main__":

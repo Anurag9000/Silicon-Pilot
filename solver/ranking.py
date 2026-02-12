@@ -5,6 +5,7 @@ Explainable multi-criteria ranking with score breakdown and transparency.
 """
 
 import logging
+import math
 from typing import List, Dict, Any, Tuple
 from core.models import OptimizationGoal, RequirementSpec
 
@@ -271,7 +272,6 @@ class RankingEngine:
         
         # Reference: 10 µA is excellent, 1000 µA is poor
         # Use logarithmic scale
-        import math
         normalized = 1.0 - (math.log10(standby_ua + 1) / math.log10(1000))
         return max(0.0, min(1.0, normalized))
     

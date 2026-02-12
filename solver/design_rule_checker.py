@@ -10,6 +10,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import uuid
 import logging
+import asyncio
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -277,8 +278,15 @@ class DesignRuleChecker:
         mcu_max = float(mcu_can['voltage_max_v'] or 0)
         
         if tx_min > mcu_max or tx_max < mcu_min:
-             pass # Logic might be flawed if ranges don't perfectly overlap or if they are just supply ranges vs IO levels. 
-             # Keeping simple overlap logic for now 
+            violations.append(Violation(
+                rule_id="C001",
+                rule_name="CAN Voltage Mismatch",
+                severity=Severity.ERROR,
+                component="CAN Bus",
+                message=f"Transceiver voltage ({tx_min}-{tx_max}V) does not overlap with MCU ({mcu_min}-{mcu_max}V).",
+                recommendation="Select a transceiver with compatible voltage levels.",
+                design_id=design_id
+            )) 
              
         # Termination Check
         has_termination = await conn.fetchval("""
@@ -393,12 +401,7 @@ class DesignRuleChecker:
             WHERE p.id = ANY($1)
         """, design_parts)
         
-        mcus = await conn.fetch("""
-            SELECT p.mpn, m.flash_kb, m.sram_kb
-            FROM parts p
-            JOIN mcu_specs m ON p.id = m.part_id
-            WHERE p.id = ANY($1)
-        """, design_parts)
+
         
         for mcu in mcus:
             # Flash

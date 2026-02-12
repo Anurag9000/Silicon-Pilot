@@ -318,9 +318,11 @@ class PowerBudgetCalculator:
 # Example usage
 async def main():
     import os
+    import asyncpg
     
     db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
-    calculator = PowerBudgetCalculator(db_url)
+    pool = await asyncpg.create_pool(db_url)
+    calculator = PowerBudgetCalculator(pool)
     
     # Example: Calculate power budget
     # mode_profiles = [
