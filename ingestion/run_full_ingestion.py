@@ -23,9 +23,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL")
-if not DB_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
+# Database URL will be initialized in main
+DB_URL = None
 
 async def run_full_ingestion(limit: int = 100):
     conn = await asyncpg.connect(DB_URL)
@@ -79,6 +78,13 @@ async def run_full_ingestion(limit: int = 100):
         await conn.close()
 
 if __name__ == "__main__":
+    # Ensure DATABASE_URL is set
+    global DB_URL
+    DB_URL = os.getenv("DATABASE_URL")
+    if not DB_URL:
+        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        os.environ["DATABASE_URL"] = DB_URL
+        
     # Allow limit override
     limit = int(sys.argv[1]) if len(sys.argv) > 1 else 50
     if os.name == 'nt':
