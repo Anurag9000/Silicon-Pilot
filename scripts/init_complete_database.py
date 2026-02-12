@@ -24,7 +24,9 @@ DB_PASSWORD = "1Anurag2Basistha"
 DB_HOST = "localhost"
 DB_PORT = "5432"
 
-PSQL_PATH = r"C:\Program Files\PostgreSQL\17\bin\psql.exe"
+import shutil
+
+PSQL_PATH = shutil.which("psql") or r"C:\Program Files\PostgreSQL\17\bin\psql.exe"
 
 def run_psql(command, db=DB_NAME):
     """Run a psql command"""
