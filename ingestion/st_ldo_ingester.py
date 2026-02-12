@@ -16,9 +16,8 @@ from pathlib import Path
 # Add repo root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-DB_URL = os.getenv("DATABASE_URL")
-if not DB_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
+# Database URL will be initialized in main
+DB_URL = None
 
 # ST LDO Families to Ingest
 # Format: {SeriesName: {PackageCode: PinCount}}
@@ -78,6 +77,12 @@ async def generate_ldo_parts(conn):
     print(f"Generated {count} LDO parts.")
 
 async def main():
+    global DB_URL
+    DB_URL = os.getenv("DATABASE_URL")
+    if not DB_URL:
+        # Fallback for manual run
+        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        
     try:
         conn = await asyncpg.connect(DB_URL)
         await generate_ldo_parts(conn)

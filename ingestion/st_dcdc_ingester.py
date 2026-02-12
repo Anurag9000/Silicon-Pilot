@@ -9,9 +9,8 @@ import os
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_URL = os.getenv("DATABASE_URL")
-if not DB_URL:
-    raise ValueError("DATABASE_URL environment variable is not set")
+# Database URL will be initialized in main
+DB_URL = None
 
 # ST DC-DC Families (Buck/Boost)
 # Identifying popular families to seed
@@ -109,6 +108,12 @@ async def seed_dcdc_parts(conn: asyncpg.Connection):
     return total_new
 
 async def main():
+    global DB_URL
+    DB_URL = os.getenv("DATABASE_URL")
+    if not DB_URL:
+        # Fallback for manual run
+        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        
     try:
         conn = await asyncpg.connect(DB_URL)
         await seed_dcdc_parts(conn)

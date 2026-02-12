@@ -107,7 +107,7 @@ class SensorIngester:
 async def main():
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
-        raise ValueError("DATABASE_URL environment variable is not set")
+        db_url = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
     pool = await asyncpg.create_pool(db_url)
     try:
         ingester = SensorIngester(pool)
