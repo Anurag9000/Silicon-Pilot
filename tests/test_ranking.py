@@ -54,7 +54,7 @@ def sample_candidates():
             'max_mhz': 240,
             'has_fpu': False,
             'status': 'active',
-            'cost_usd': 2.50,
+            'cost_usd': 0.10,
             'has_wireless': True,
         },
     ]

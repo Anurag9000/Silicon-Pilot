@@ -192,7 +192,7 @@ class STM32DatasheetExtractor:
                         # Keep the max found (e.g. if it sees "3x SPI" and later "SPI1, SPI2", regex might match 3)
                         if count > counts[key]:
                             counts[key] = count
-                    except:
+                    except Exception:
                         pass
         
         # USB special case
@@ -269,7 +269,7 @@ class STM32DatasheetExtractor:
         # Clear existing
         await conn.execute("DELETE FROM mcu_pin_functions WHERE part_id = $1", part_id)
         
-        for p in pins:
+        for pin_num, p in enumerate(pins, start=1):
             # Distribute AFs into af0_function...af15_function
             afs = p['af_functions'] if p['af_functions'] else []
             # Pad with None up to 16

@@ -7,7 +7,7 @@ interfaces, and environmental contexts used in template-based architecture synth
 
 from __future__ import annotations
 from enum import Enum
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 from pydantic import BaseModel, Field
 
 

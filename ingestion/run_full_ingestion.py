@@ -79,7 +79,6 @@ async def run_full_ingestion(limit: int = 100):
 
 if __name__ == "__main__":
     # Ensure DATABASE_URL is set
-    global DB_URL
     DB_URL = os.getenv("DATABASE_URL")
     if not DB_URL:
         DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"

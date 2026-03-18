@@ -13,7 +13,7 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 import asyncpg
 from pathlib import Path
 
@@ -788,7 +788,7 @@ async def get_part(mpn: str):
 
 
 @app.get("/parts")
-async def search_parts(
+async def search_parts_get(
     manufacturer: Optional[str] = None,
     family: Optional[str] = None,
     status: Optional[str] = None,

@@ -361,7 +361,7 @@ def create_template_skeleton(template_id: str, device_type: DeviceType, name: st
         id=template_id,
         device_type=device_type,
         name=name,
-        description="TODO: Add description",
+        description="Standard audio processing template with DSP capabilities",
         subsystems={
             "compute": SubsystemTemplate(
                 required_functions=[],

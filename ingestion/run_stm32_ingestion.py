@@ -40,6 +40,8 @@ class STM32CompleteIngester:
     async def ingest_all(self):
         """Complete ingestion pipeline"""
         
+        total_inserted = 0
+        
         print("\n" + "="*60)
         print("STM32 COMPLETE INGESTION PIPELINE")
         print("="*60 + "\n")
@@ -125,7 +127,7 @@ class STM32CompleteIngester:
         print("="*60)
         print("INGESTION COMPLETE")
         print("="*60)
-        print(f"Total parts in database: {inserted_count}")
+        print(f"Total parts in database: {total_inserted}")
         print(f"Families covered: {', '.join(download_results.keys())}")
         print()
     

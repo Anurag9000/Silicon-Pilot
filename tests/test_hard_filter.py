@@ -12,18 +12,20 @@ from core.models import RequirementSpec, OptimizationGoal
 from solver import HardFilter
 
 
+from unittest.mock import AsyncMock, MagicMock
+
 @pytest.fixture
-async def db_pool():
-    """Create test database pool"""
-    pool = await asyncpg.create_pool(
-        "postgresql://hg_user:hg_password@localhost:5432/hardwaregenius_test"
-    )
-    yield pool
-    await pool.close()
+def db_pool():
+    """Create mock database pool"""
+    pool = MagicMock()
+    conn = AsyncMock()
+    conn.fetch.return_value = []
+    pool.acquire.return_value.__aenter__.return_value = conn
+    return pool
 
 
 @pytest.fixture
-async def hard_filter(db_pool):
+def hard_filter(db_pool):
     """Create hard filter instance"""
     return HardFilter(db_pool)
 

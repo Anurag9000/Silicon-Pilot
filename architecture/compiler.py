@@ -3,6 +3,8 @@ import logging
 from pydantic import BaseModel, Field
 from copy import deepcopy
 
+from typing import Optional, Any, Dict, List
+
 from core.ontology import (
     ArchitectureGraph, Subsystem, Interface, SubsystemType, InterfaceType,
     EnvironmentalRequirements, PerformanceRequirements

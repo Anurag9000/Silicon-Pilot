@@ -281,7 +281,7 @@ class ConfigurationGenerator:
             if sensor.notes and "µA" in sensor.notes:
                 try:
                     current_ua = int(sensor.notes.split("Current: ")[1].split("µA")[0])
-                except:
+                except Exception:
                     pass
             
             budget.append(PowerBudget(
