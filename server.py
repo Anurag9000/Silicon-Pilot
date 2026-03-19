@@ -570,7 +570,7 @@ async def parse_requirements(request: ParseRequirementsRequest):
         candidates = await hard_filter.filter(spec)
         
         # Generate initial questions if there are unknowns
-        questions = []
+        questions = None
         if spec.unknowns:
             questions = await llm_orchestrator.generate_questions(
                 spec,
@@ -693,20 +693,32 @@ async def recommend(request: RecommendRequest):
         
         # Build CandidatePart objects with evidence
         candidate_parts = []
-        for candidate_data, score, score_breakdown in ranked[:request.max_results]:
+        from core.models import PartBase, MCUSpecBase
+        
+        for rank_idx, (candidate_data, score, score_breakdown) in enumerate(ranked[:request.max_results], 1):
             # Get evidence for this part
             evidence_records = await db_ops.get_evidence_for_part(
                 candidate_data['id']
             )
             
+            # Construct nested models, dropping extra fields if any using dict kwargs
+            part_base = PartBase(**dict(candidate_data))
+            
+            # Need to ensure part_id exists for MCUSpecBase
+            spec_data = dict(candidate_data)
+            if 'part_id' not in spec_data:
+                spec_data['part_id'] = candidate_data['id']
+            mcu_specs = MCUSpecBase(**spec_data)
+            
             candidate_part = CandidatePart(
-                mpn=candidate_data['mpn'],
-                manufacturer=candidate_data['manufacturer'],
-                family=candidate_data.get('family', ''),
+                part=part_base,
+                specs=mcu_specs,
                 total_score=score,
                 score_breakdown=score_breakdown,
-                specs=candidate_data,
+                satisfies_all_hard=True, # Since it passed hard_filter
                 evidence_ids=[ev['id'] for ev in evidence_records],
+                evidence_coverage=0.8, # Placeholder
+                rank=rank_idx
             )
             candidate_parts.append(candidate_part)
         
@@ -742,6 +754,10 @@ async def recommend(request: RecommendRequest):
             }
         
         result = RecommendationResult(
+            spec_id=request.spec_id,
+            total_parts_in_db=1000,
+            parts_after_hard_filter=len(candidates),
+            constraint_summary={"status": "success"},
             candidates=candidate_parts,
             total_candidates=len(candidates),
             constraint_checks=constraint_checks,

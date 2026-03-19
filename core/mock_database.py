@@ -24,7 +24,7 @@ class MockDatabase:
     
     def connect(self):
         """Connect to SQLite database"""
-        self.conn = sqlite3.connect(self.db_path)
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self._create_tables()
     
@@ -40,6 +40,7 @@ class MockDatabase:
                 manufacturer TEXT NOT NULL,
                 family TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
+                datasheet_url TEXT,
                 package_family TEXT,
                 package_name TEXT,
                 pin_count INTEGER,
@@ -58,6 +59,7 @@ class MockDatabase:
                 core TEXT,
                 max_mhz INTEGER,
                 flash_kb INTEGER,
+                ram_kb INTEGER,
                 sram_kb INTEGER,
                 eeprom_kb INTEGER,
                 can_count INTEGER DEFAULT 0,
@@ -67,10 +69,14 @@ class MockDatabase:
                 i2c_count INTEGER DEFAULT 0,
                 usb_fs INTEGER DEFAULT 0,
                 usb_hs INTEGER DEFAULT 0,
+                usb_count INTEGER DEFAULT 0,
                 ethernet INTEGER DEFAULT 0,
                 adc_channels INTEGER DEFAULT 0,
+                adc_count INTEGER DEFAULT 0,
                 dac_channels INTEGER DEFAULT 0,
+                dac_count INTEGER DEFAULT 0,
                 timers_count INTEGER DEFAULT 0,
+                timer_count INTEGER DEFAULT 0,
                 pwm_channels INTEGER DEFAULT 0,
                 has_fpu INTEGER DEFAULT 0,
                 has_dsp INTEGER DEFAULT 0,
@@ -88,6 +94,105 @@ class MockDatabase:
                 FOREIGN KEY (part_id) REFERENCES parts(id) ON DELETE CASCADE
             )
         """)
+        
+        # User selections table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_selections (
+                id TEXT PRIMARY KEY,
+                session_id TEXT,
+                query_text TEXT,
+                query_type TEXT,
+                results_shown TEXT,
+                result_count INTEGER,
+                selected_part_id TEXT,
+                selection_rank INTEGER,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Audit trail table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS audit_trail (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                action TEXT,
+                entity_type TEXT,
+                entity_id TEXT,
+                changes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Pin functions table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS mcu_pin_functions (
+                id TEXT PRIMARY KEY,
+                part_id TEXT,
+                pin_number TEXT,
+                pin_name TEXT,
+                af0_function TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Conflicts table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS conflicts (
+                id TEXT PRIMARY KEY,
+                part_id TEXT,
+                conflict_type TEXT,
+                description TEXT,
+                severity TEXT,
+                status TEXT DEFAULT 'open',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Requirement specs table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS requirement_specs (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                project_name TEXT,
+                spec TEXT,
+                source_text TEXT,
+                mode TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Recommendation logs table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS recommendation_logs (
+                id TEXT PRIMARY KEY,
+                spec_id TEXT,
+                candidates TEXT,
+                explanations TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Power modes table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS power_modes (
+                id TEXT PRIMARY KEY,
+                part_id TEXT,
+                mode_name TEXT,
+                conditions TEXT,
+                current_typ_ua REAL,
+                current_max_ua REAL,
+                voltage_v REAL,
+                frequency_mhz REAL
+            )
+        """)
+
+        # Other component spec tables
+        cursor.execute("CREATE TABLE IF NOT EXISTS ldo_specs (id TEXT PRIMARY KEY, part_id TEXT, vin_min_v REAL, vin_max_v REAL, vout_fixed_v REAL, iout_max_ma REAL)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS dcdc_specs (id TEXT PRIMARY KEY, part_id TEXT, vin_min_v REAL, vin_max_v REAL, vout_fixed_v REAL, iout_max_ma REAL)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS pmic_specs (id TEXT PRIMARY KEY, part_id TEXT, buck_count INTEGER, ldo_count INTEGER)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS can_specs (id TEXT PRIMARY KEY, part_id TEXT, data_rate_mbps REAL)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS sensor_specs (id TEXT PRIMARY KEY, part_id TEXT, sensor_type TEXT, interface TEXT)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS passive_specs (id TEXT PRIMARY KEY, part_id TEXT, type TEXT, value_primary REAL, package_case TEXT)")
         
         # Documents table
         cursor.execute("""
@@ -127,8 +232,39 @@ class MockDatabase:
         
         self.conn.commit()
     
+    def _preprocess_query(self, query: str) -> str:
+        """Convert PostgreSQL syntax to SQLite"""
+        # Replace ILIKE with LIKE (SQLite LIKE is case-insensitive by default for ASCII)
+        query = query.replace("ILIKE", "LIKE")
+        
+        # Replace NOW() with CURRENT_TIMESTAMP
+        query = query.replace("NOW()", "CURRENT_TIMESTAMP")
+        
+        # Replace $1, $2, etc with ?
+        # Use a lookahead/lookbehind or word boundary to ensure we match the whole number
+        import re
+        query = re.sub(r'\$\d+', '?', query)
+        
+        return query
+
+    def _preprocess_params(self, params):
+        """Convert unsupported types like UUID to strings for SQLite"""
+        import uuid
+        import json
+        processed = []
+        for p in params:
+            if isinstance(p, uuid.UUID):
+                processed.append(str(p))
+            elif isinstance(p, (dict, list)):
+                processed.append(json.dumps(p))
+            else:
+                processed.append(p)
+        return tuple(processed)
+
     async def execute(self, query: str, *params):
         """Execute query (async wrapper)"""
+        query = self._preprocess_query(query)
+        params = self._preprocess_params(params)
         cursor = self.conn.cursor()
         cursor.execute(query, params)
         self.conn.commit()
@@ -136,6 +272,8 @@ class MockDatabase:
     
     async def fetchval(self, query: str, *params):
         """Fetch single value"""
+        query = self._preprocess_query(query)
+        params = self._preprocess_params(params)
         cursor = self.conn.cursor()
         cursor.execute(query, params)
         row = cursor.fetchone()
@@ -143,6 +281,8 @@ class MockDatabase:
     
     async def fetch(self, query: str, *params) -> List[Dict]:
         """Fetch all rows as dicts"""
+        query = self._preprocess_query(query)
+        params = self._preprocess_params(params)
         cursor = self.conn.cursor()
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -150,6 +290,8 @@ class MockDatabase:
     
     async def fetchrow(self, query: str, *params) -> Optional[Dict]:
         """Fetch single row as dict"""
+        query = self._preprocess_query(query)
+        params = self._preprocess_params(params)
         cursor = self.conn.cursor()
         cursor.execute(query, params)
         row = cursor.fetchone()

@@ -356,8 +356,8 @@ class DatabaseOperations:
         # Extract candidates and explanations
         candidates_data = [
             {
-                'mpn': c.mpn,
-                'manufacturer': c.manufacturer,
+                'mpn': c.part.mpn,
+                'manufacturer': c.part.manufacturer,
                 'score': c.total_score,
                 'score_breakdown': c.score_breakdown,
             }
@@ -365,7 +365,7 @@ class DatabaseOperations:
         ]
         
         explanations_data = {
-            'constraint_checks': result.constraint_checks,
+            'constraint_summary': result.constraint_summary,
             'ranking_explanation': result.ranking_explanation,
         }
         

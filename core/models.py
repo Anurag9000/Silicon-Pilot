@@ -401,8 +401,10 @@ class ParseRequirementsRequest(BaseModel):
 
 class ParseRequirementsResponse(BaseModel):
     """Response with parsed spec and initial questions"""
+    spec_id: UUID
     spec: "RequirementSpec"
     questions: Optional[QuestionBatch] = None
+    candidates_count: Optional[int] = 0
 
 ParseRequirementsResponse.model_rebuild()
 
