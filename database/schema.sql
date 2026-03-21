@@ -139,6 +139,31 @@ CREATE INDEX IF NOT EXISTS idx_mcu_specs_peripherals ON mcu_specs(uart_count, sp
 CREATE INDEX IF NOT EXISTS idx_mcu_specs_composite ON mcu_specs(core, flash_kb, sram_kb);
 
 -- ============================================================================
+-- DATASHEET_PARAMETERS TABLE
+-- Deep parameter extraction from PDFs: every min/typ/max row, per section, per page
+-- ============================================================================
+DROP TABLE IF EXISTS datasheet_parameters CASCADE;
+CREATE TABLE IF NOT EXISTS datasheet_parameters (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+    section VARCHAR(100) NOT NULL,      -- e.g. 'absolute_max', 'dc_characteristics', 'thermal'
+    parameter VARCHAR(255) NOT NULL,    -- e.g. 'VIH — Input high-level voltage'
+    min_value TEXT,
+    typ_value TEXT,
+    max_value TEXT,
+    unit VARCHAR(50),
+    conditions TEXT,
+    source_page INTEGER,                -- PDF page number
+    raw_text TEXT,                      -- Raw extracted snippet
+    confidence REAL DEFAULT 1.0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ds_params_part ON datasheet_parameters(part_id);
+CREATE INDEX IF NOT EXISTS idx_ds_params_section ON datasheet_parameters(part_id, section);
+CREATE INDEX IF NOT EXISTS idx_ds_params_param ON datasheet_parameters(parameter);
+
+-- ============================================================================
 -- DOCUMENTS TABLE
 -- Source tracking with hash, version, fetch timestamp
 -- ============================================================================

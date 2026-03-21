@@ -362,29 +362,51 @@ async def architect_peer_review(request: Dict):
 async def exhaustive_parameter_review(request: Dict):
     """
     Triggers an exhaustive parameter-by-parameter AI evaluation against user requirements.
+    Merges database fields with deep PDF-extracted parameters from datasheet_parameters table.
     """
     try:
         req_id = request.get("req_id")
         part_id = request.get("part_id")
-        
+
         if not req_id or not part_id:
             raise HTTPException(status_code=400, detail="Missing req_id or part_id.")
-            
+
         spec = await db_ops.get_requirement_spec(UUID(req_id))
         if not spec:
             raise HTTPException(status_code=404, detail="Requirement spec not found.")
-            
+
         part = await db_ops.get_part_by_id(UUID(part_id))
         if not part:
             raise HTTPException(status_code=404, detail="Component not found.")
-            
-        review = await rigorous_explainer.generate_exhaustive_parameter_review(spec, part)
+
+        # Fetch all datasheet-extracted parameters for this part (may be empty)
+        datasheet_params: List[Dict] = []
+        try:
+            pool = db.pool
+            async with pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """SELECT section, parameter, min_value, typ_value, max_value,
+                              unit, conditions, source_page, confidence
+                       FROM datasheet_parameters
+                       WHERE part_id = $1
+                       ORDER BY section, source_page""",
+                    part_id
+                )
+                datasheet_params = [dict(r) for r in rows]
+        except Exception as e:
+            logger.warning(f"Could not fetch datasheet_parameters: {e}")
+
+        review = await rigorous_explainer.generate_exhaustive_parameter_review(
+            spec, part, datasheet_params=datasheet_params
+        )
         return review
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Exhaustive review error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @app.post("/api/bom/check")
 async def check_bom_compatibility(request: Dict):

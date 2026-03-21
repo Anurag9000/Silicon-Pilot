@@ -180,49 +180,86 @@ Other candidates considered: {', '.join(all_mpns[1:])}
     async def generate_exhaustive_parameter_review(
         self,
         spec: 'RequirementSpec',
-        candidate: Dict[str, Any]
+        candidate: Dict[str, Any],
+        datasheet_params: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
-        Takes a single candidate and exhaustively verifies EVERY SINGLE PARAMETER available in the database
-        against the user's base requirements constraint. Returns a row-by-row breakdown.
+        Exhaustively verifies EVERY SINGLE PARAMETER — from the DB spec fields
+        AND from real datasheet PDF extractions (datasheet_params).
+
+        Returns a row-by-row breakdown with section, source page, and justification.
         """
         logger.info(f"Generating exhaustive parameter review for {candidate.get('mpn', 'Unknown')}")
 
-        system_prompt = """You are a meticulous, highly-critical hardware systems architect.
-Your job is to provide Explainable AI (XAI) transparency by reviewing EVERY SINGLE KNOWN DATASHEET PARAMETER of the provided component against the user's workload requirements.
-
-You must evaluate each parameter strictly and provide a JSON array. DO NOT summarize or skip metrics.
-If the component data contains Flash, RAM, MHz, CAN counts, ADC bits, Thermal Resistance, Voltage, Timer counts etc., yield a separate JSON object for each one.
-
-OUTPUT FORMAT — respond with ONLY valid JSON:
-{
-  "exhaustive_review": [
-    {
-      "parameter": "Wait States / Flash Memory Limit",
-      "datasheet_value": "1024 KB",
-      "required_value": "512 KB min",
-      "fit_level": "Exceeds",  // Must be one of: "Exceeds", "Meets", "Warning", "Fails"
-      "architect_justification": "Provides ample headroom for OTA payload boundaries. Overprovisioned safely."
-    },
-    ...
-  ]
-}
-
-Be exhaustive. Include all electrical, thermal, structural, and silicon capabilities present in the JSON.
-"""
-
-        # Serialize the combined candidate dict so the prompt sees all top-level and spec fields
         combined_specs = dict(candidate)
         if 'specs' in combined_specs:
             combined_specs.update(combined_specs.pop('specs'))
 
-        user_prompt = f"""Target Workload Requirements:
+        # Build PDF parameter section for the prompt
+        pdf_param_lines = ""
+        if datasheet_params:
+            by_section: Dict[str, List[Dict]] = {}
+            for p in datasheet_params:
+                s = p.get("section", "other")
+                by_section.setdefault(s, []).append(p)
+
+            lines = []
+            for section, rows in sorted(by_section.items()):
+                lines.append(f"\n### {section.replace('_', ' ').title()}")
+                for r in rows:
+                    lines.append(
+                        f"  • {r.get('parameter', '')}: "
+                        f"min={r.get('min_value', '-')} "
+                        f"typ={r.get('typ_value', '-')} "
+                        f"max={r.get('max_value', '-')} "
+                        f"{r.get('unit', '')}  "
+                        f"[cond: {r.get('conditions') or 'n/a'}]  "
+                        f"[page {r.get('source_page', '?')}]"
+                    )
+            pdf_param_lines = "\n".join(lines)
+
+        system_prompt = """You are a meticulous hardware systems architect specializing in Explainable AI (XAI) transparency for embedded MCU selection.
+
+TASK: Perform an EXHAUSTIVE, parameter-by-parameter verification of the component against user requirements.
+
+RULES:
+1. Evaluate EVERY SINGLE parameter listed — from DB fields AND from PDF extraction sections.
+2. Each parameter = its own separate JSON object. Never summarize or group.
+3. For PDF-sourced params, include section name and PDF page number in the justification.
+4. fit_level must be exactly ONE of: "Exceeds" | "Meets" | "Warning" | "Fails"
+5. Write precise, technical justifications with actual numbers and engineering rationale.
+
+OUTPUT — respond ONLY with valid JSON (no markdown):
+{
+  "exhaustive_review": [
+    {
+      "section": "dc_characteristics",
+      "parameter": "VIH — Input High Voltage",
+      "datasheet_value": "0.7×VDD to VDD+0.4 V",
+      "required_value": "CMOS 3.3V compatible",
+      "fit_level": "Meets",
+      "source_page": 87,
+      "architect_justification": "Threshold 0.7×3.3V=2.31V; nominal output 2.4V gives 90mV margin. Adequate."
+    }
+  ]
+}
+
+Cover ALL: Flash, RAM, MHz, CAN interfaces, ADC, SPI, I2C, USB, Timers, FPU, voltage range, power modes, thermal resistance, package temp range, GPIO drive strength, clock accuracy, absolute max ratings, AC timing, and any other parameter extracted from the PDF.
+"""
+        pdf_block = (
+            f"\n=== PDF EXTRACTION ({len(datasheet_params)} params from actual datasheet pages) ===\n{pdf_param_lines}"
+            if datasheet_params
+            else "\n[No PDF extraction available for this part — evaluate DB fields only.]\n"
+        )
+
+        user_prompt = f"""## User Requirements
 {spec.model_dump_json(indent=2)}
 
-Datasheet Dump for {candidate.get('mpn')}:
+## Component Record: {candidate.get('mpn')}
 {json.dumps(combined_specs, indent=2)}
+{pdf_block}
 
-Perform the exhaustive line-by-line verification."""
+Perform exhaustive, traceable, line-by-line verification of every parameter above."""
 
         try:
             response = await self.client.chat.completions.create(
@@ -237,3 +274,4 @@ Perform the exhaustive line-by-line verification."""
         except Exception as e:
             logger.error(f"Exhaustive review failed: {e}")
             return {"exhaustive_review": []}
+

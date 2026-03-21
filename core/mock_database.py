@@ -142,8 +142,27 @@ class MockDatabase:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
-        # Conflicts table
+
+        # Datasheet parameters table — deep extractions from PDFs
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS datasheet_parameters (
+                id TEXT PRIMARY KEY,
+                part_id TEXT NOT NULL,
+                section TEXT NOT NULL,
+                parameter TEXT NOT NULL,
+                min_value TEXT,
+                typ_value TEXT,
+                max_value TEXT,
+                unit TEXT,
+                conditions TEXT,
+                source_page INTEGER,
+                raw_text TEXT,
+                confidence REAL DEFAULT 1.0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS conflicts (
                 id TEXT PRIMARY KEY,
