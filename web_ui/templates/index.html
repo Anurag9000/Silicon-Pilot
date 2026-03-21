@@ -504,7 +504,8 @@
                         <button onclick="event.stopPropagation(); conductDebate('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 4px; cursor: pointer;">⚔️ Debate</button>
                         <button onclick="event.stopPropagation(); addToComparison('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #dcfce7; color: #166534; border: 1px solid #86efac; border-radius: 4px; cursor: pointer;">📊 Matrix</button>
                         <button onclick="event.stopPropagation(); addToBOM('${partId}', '${mpn}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 4px; cursor: pointer;">🧩 Add to BOM</button>
-                        ${isTop ? `<button onclick="event.stopPropagation(); peerReview()" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #ede9fe; color: #5b21b6; border: 1px solid #a78bfa; border-radius: 4px; cursor: pointer;">🔍 Architect Review</button>` : ''}
+                        <button onclick="event.stopPropagation(); peerReview('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #ede9fe; color: #5b21b6; border: 1px solid #a78bfa; border-radius: 4px; cursor: pointer;">🔍 Architect Review</button>
+                        <button onclick="event.stopPropagation(); exhaustiveReview('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8; border-radius: 4px; cursor: pointer;">📑 Full Detail Verification</button>
                     </div>
                     ${evidenceHtml ? `<div class="evidence-viewer"><strong>Evidence:</strong>${evidenceHtml}</div>` : ''}
                 </div>
@@ -555,6 +556,87 @@
                             <p style="margin-top:0.25rem; font-size:0.95rem; line-height:1.5;">${t.argument}</p>
                         </div>
                     `).join('')}
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // ── Exhaustive Parameter Review ──────────────────────────────────
+        async function exhaustiveReview(partId) {
+            setLoading(true);
+            try {
+                const response = await fetch('/api/exhaustive-review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        req_id: currentSpecId,
+                        part_id: partId
+                    })
+                });
+                const data = await response.json();
+                if (data.exhaustive_review) {
+                    showExhaustiveModal(data.exhaustive_review);
+                } else {
+                    alert('No exhaustive data returned.');
+                }
+            } catch (e) {
+                alert("Exhaustive Review failed: " + e.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function showExhaustiveModal(reviewArray) {
+            const modal = document.createElement('div');
+            modal.style = "position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:2000; padding: 2rem;";
+            
+            // Map JSON array to <tr> rows
+            const rowsHtml = reviewArray.map(item => {
+                let badgeColor = '#9ca3af'; // Default gray
+                let icon = '';
+                const fit = (item.fit_level || '').toLowerCase();
+                if (fit.includes('exceeds')) { badgeColor = '#10b981'; icon = '⭐'; }
+                else if (fit.includes('meets')) { badgeColor = '#3b82f6'; icon = '✅'; }
+                else if (fit.includes('warn')) { badgeColor = '#f59e0b'; icon = '⚠️'; }
+                else if (fit.includes('fail')) { badgeColor = '#ef4444'; icon = '❌'; }
+                
+                return `
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding:1rem; font-weight:600; vertical-align:top; color:#1e293b;">${item.parameter}</td>
+                        <td style="padding:1rem; font-family:monospace; vertical-align:top;">${item.datasheet_value}</td>
+                        <td style="padding:1rem; font-family:monospace; vertical-align:top;">${item.required_value}</td>
+                        <td style="padding:1rem; vertical-align:top; text-align:center;">
+                            <span style="background:${badgeColor}20; color:${badgeColor}; padding:0.25rem 0.5rem; border-radius:4px; font-weight:600; font-size:0.8rem; white-space:nowrap;">
+                                ${icon} ${item.fit_level}
+                            </span>
+                        </td>
+                        <td style="padding:1rem; vertical-align:top; color:#475569; font-size:0.9rem; line-height:1.4;">${item.architect_justification}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            modal.innerHTML = `
+                <div style="background:white; padding:0; border-radius:12px; width:100%; max-width:1400px; max-height:95vh; display:flex; flex-direction:column; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); position:relative;">
+                    <div style="padding:1.5rem; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+                        <h2 style="margin:0; color:#0f172a;">📑 Exhaustive Parameter Transparency Report</h2>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:#ef4444; color:white; border:none; padding:0.5rem 1rem; border-radius:6px; cursor:pointer; font-weight:bold;">Close ✕</button>
+                    </div>
+                    <div style="overflow:auto; padding:0;">
+                        <table style="width:100%; border-collapse:collapse; text-align:left;">
+                            <thead style="background:#f8fafc; position:sticky; top:0; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                                <tr>
+                                    <th style="padding:1rem; font-size:0.875rem; text-transform:uppercase; color:#64748b;">Parameter</th>
+                                    <th style="padding:1rem; font-size:0.875rem; text-transform:uppercase; color:#64748b; width:15%;">Datasheet Extracted</th>
+                                    <th style="padding:1rem; font-size:0.875rem; text-transform:uppercase; color:#64748b; width:15%;">Required Limit</th>
+                                    <th style="padding:1rem; font-size:0.875rem; text-transform:uppercase; color:#64748b; text-align:center;">Fit Score</th>
+                                    <th style="padding:1rem; font-size:0.875rem; text-transform:uppercase; color:#64748b; width:40%;">AI Justification & Verifiability</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             `;
             document.body.appendChild(modal);
@@ -857,13 +939,13 @@
             }
         }
 
-        async function peerReview() {
+        async function peerReview(partId = null) {
             if (!currentSpecId) { alert('Analyze requirements first.'); return; }
             const overlay = document.createElement('div');
             overlay.id = 'review-overlay';
             overlay.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:2000;';
             overlay.innerHTML = `<div style="background:white;padding:2rem;border-radius:12px;min-width:400px;max-width:700px;max-height:85vh;overflow-y:auto;position:relative;">
-                <button onclick="document.getElementById('review-overlay').remove()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button>
+                <button onclick="document.getElementById('review-overlay').remove()" style="position:absolute;top:1rem;right:1rem;background:#ef4444;color:white;border:none;border-radius:4px;width:32px;height:32px;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 4px rgba(239,68,68,0.3);">✕</button>
                 <h2 style="margin-top:0;color:#5b21b6;">🔍 Architect's Peer Review</h2>
                 <p style="color:#64748b;font-size:0.9rem;">AI Senior Hardware Engineer is reviewing your design…</p>
                 <div id="review-content"><div style="text-align:center;padding:2rem;">⏳ Generating review…</div></div>
@@ -871,10 +953,13 @@
             document.body.appendChild(overlay);
 
             try {
+                const reqBody = {spec_id: currentSpecId};
+                if (partId) reqBody.part_id = partId;
+
                 const resp = await fetch('/api/peer-review', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({spec_id: currentSpecId})
+                    body: JSON.stringify(reqBody)
                 });
                 const r = await resp.json();
                 const verdictColor = r.verdict === 'green' ? '#166534' : r.verdict === 'amber' ? '#92400e' : '#991b1b';

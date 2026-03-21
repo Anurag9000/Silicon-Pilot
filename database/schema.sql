@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS parts (
     package_family VARCHAR(50),
     package_name VARCHAR(100),
     pin_count INTEGER,
+    theta_ja_c_w REAL,
     temp_min_c INTEGER,
     temp_max_c INTEGER,
     datasheet_url TEXT,

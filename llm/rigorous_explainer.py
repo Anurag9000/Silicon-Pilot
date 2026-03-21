@@ -176,3 +176,64 @@ Other candidates considered: {', '.join(all_mpns[1:])}
                 "missing_considerations": [],
                 "recommended_action": "Please review the design manually."
             }
+
+    async def generate_exhaustive_parameter_review(
+        self,
+        spec: 'RequirementSpec',
+        candidate: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Takes a single candidate and exhaustively verifies EVERY SINGLE PARAMETER available in the database
+        against the user's base requirements constraint. Returns a row-by-row breakdown.
+        """
+        logger.info(f"Generating exhaustive parameter review for {candidate.get('mpn', 'Unknown')}")
+
+        system_prompt = """You are a meticulous, highly-critical hardware systems architect.
+Your job is to provide Explainable AI (XAI) transparency by reviewing EVERY SINGLE KNOWN DATASHEET PARAMETER of the provided component against the user's workload requirements.
+
+You must evaluate each parameter strictly and provide a JSON array. DO NOT summarize or skip metrics.
+If the component data contains Flash, RAM, MHz, CAN counts, ADC bits, Thermal Resistance, Voltage, Timer counts etc., yield a separate JSON object for each one.
+
+OUTPUT FORMAT — respond with ONLY valid JSON:
+{
+  "exhaustive_review": [
+    {
+      "parameter": "Wait States / Flash Memory Limit",
+      "datasheet_value": "1024 KB",
+      "required_value": "512 KB min",
+      "fit_level": "Exceeds",  // Must be one of: "Exceeds", "Meets", "Warning", "Fails"
+      "architect_justification": "Provides ample headroom for OTA payload boundaries. Overprovisioned safely."
+    },
+    ...
+  ]
+}
+
+Be exhaustive. Include all electrical, thermal, structural, and silicon capabilities present in the JSON.
+"""
+
+        # Serialize the combined candidate dict so the prompt sees all top-level and spec fields
+        combined_specs = dict(candidate)
+        if 'specs' in combined_specs:
+            combined_specs.update(combined_specs.pop('specs'))
+
+        user_prompt = f"""Target Workload Requirements:
+{spec.model_dump_json(indent=2)}
+
+Datasheet Dump for {candidate.get('mpn')}:
+{json.dumps(combined_specs, indent=2)}
+
+Perform the exhaustive line-by-line verification."""
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            logger.error(f"Exhaustive review failed: {e}")
+            return {"exhaustive_review": []}

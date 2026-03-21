@@ -37,15 +37,16 @@ class MockDatabase:
             CREATE TABLE IF NOT EXISTS parts (
                 id TEXT PRIMARY KEY,
                 mpn TEXT NOT NULL UNIQUE,
-                manufacturer TEXT NOT NULL,
+                manufacturer TEXT,
                 family TEXT,
-                status TEXT NOT NULL DEFAULT 'active',
+                status TEXT,
                 datasheet_url TEXT,
                 package_family TEXT,
                 package_name TEXT,
                 pin_count INTEGER,
-                temp_min_c INTEGER,
-                temp_max_c INTEGER,
+                theta_ja_c_w REAL,
+                temp_min_c INTEGER DEFAULT -40,
+                temp_max_c INTEGER DEFAULT 85,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )

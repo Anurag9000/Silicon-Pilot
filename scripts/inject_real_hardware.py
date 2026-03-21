@@ -32,9 +32,9 @@ def inject_to_db(conn, db_type):
     
     # Insert Part
     cursor.execute(f"""
-        INSERT INTO parts (id, mpn, manufacturer, family, status, datasheet_url, package_name, pin_count)
-        VALUES ({','.join([placeholder]*8)})
-    """, (part_id, mpn, 'STMicroelectronics', 'STM32H7', 'active', 'https://www.st.com/resource/en/datasheet/stm32h743vi.pdf', 'LQFP100', 100))
+        INSERT INTO parts (id, mpn, manufacturer, family, status, datasheet_url, package_name, pin_count, theta_ja_c_w)
+        VALUES ({','.join([placeholder]*9)})
+    """, (part_id, mpn, 'STMicroelectronics', 'STM32H7', 'active', 'https://www.st.com/resource/en/datasheet/stm32h743vi.pdf', 'LQFP100', 100, 42.5))
     
     # Insert Specs
     cursor.execute(f"DELETE FROM mcu_specs WHERE part_id = {placeholder}", (part_id,))

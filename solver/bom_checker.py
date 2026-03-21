@@ -107,6 +107,7 @@ class BOMCompatibilityChecker:
 
         self._check_voltage_compatibility(parts, mcus, ldos + pmics, report)
         self._check_power_supply_adequacy(parts, mcus, ldos, report)
+        self._check_thermal_dissipation(parts, report)
         self._check_temperature_overlap(parts, report)
         self._check_can_compatibility(mcus, cans, report)
         self._check_multiple_mcus(mcus, report)
@@ -321,6 +322,81 @@ class BOMCompatibilityChecker:
                     f"✓ All parts share common operating range: [{overlap_min}°C to {overlap_max}°C] "
                     f"({overlap_max - overlap_min}°C window)."
                 ),
+            ))
+
+    def _check_thermal_dissipation(self, parts: List[Dict], report: BOMReport):
+        """Estimate Junction Temperature (Tj) based on Power Dissipation (Pd) and Theta_JA."""
+        ambient_temp = 50.0  # Assume a moderate 50C ambient for this check
+        
+        checked_any = False
+        for p in parts:
+            mpn = str(p.get("mpn") or "?")
+            specs = p.get("specs", p)
+            theta_ja = self._safe_float(p.get("theta_ja_c_w"))
+            t_max = self._safe_float(p.get("temp_max_c")) or 85.0
+            
+            if theta_ja is None:
+                continue
+                
+            ptype = self._infer_type(p)
+            pd_watts = 0.0
+            
+            if ptype == "mcu":
+                # MCU power: VDD * I_active
+                vdd = self._safe_float(specs.get("vdd_max_v")) or 3.3
+                i_active = self._safe_float(specs.get("active_ma")) or 150.0
+                pd_watts = vdd * (i_active / 1000.0)
+            elif ptype == "ldo":
+                # LDO power: (Vin - Vout) * I_load. Assume Vin=5V and max Iout
+                vin = self._safe_float(specs.get("input_voltage_max_v")) or 5.0
+                vout = self._safe_float(specs.get("output_voltage_v")) or 3.3
+                iout = self._safe_float(specs.get("output_current_max_a")) or (self._safe_float(specs.get("iout_max_ma")) or 100.0) / 1000.0
+                pd_watts = max(0, vin - vout) * iout
+            else:
+                continue
+                
+            t_j = ambient_temp + (pd_watts * theta_ja)
+            checked_any = True
+            
+            if t_j >= t_max:
+                report.issues.append(CompatibilityIssue(
+                    check_name="Thermal Dissipation (Tj)",
+                    severity=CheckSeverity.FAIL,
+                    parts_involved=[mpn],
+                    message=(
+                        f"THERMAL OVERLOAD: Estimated Junction Temperature {t_j:.1f}°C exceeds "
+                        f"Absolute Max {t_max:.1f}°C. (Pd: {pd_watts*1000:.0f}mW, θJA: {theta_ja}°C/W)."
+                    ),
+                    recommendation=f"Use a larger package for {mpn}, add a heatsink, or lower power draw.",
+                ))
+            elif t_j >= t_max - 15.0:
+                report.warnings.append(CompatibilityIssue(
+                    check_name="Thermal Dissipation (Tj)",
+                    severity=CheckSeverity.WARNING,
+                    parts_involved=[mpn],
+                    message=(
+                        f"High Junction Temperature: {t_j:.1f}°C is within 15°C of Absolute Max {t_max:.1f}°C. "
+                        f"(Pd: {pd_watts*1000:.0f}mW, θJA: {theta_ja}°C/W)."
+                    ),
+                    recommendation="Ensure good PCB thermal relief vias. Consider a lower ambient limit.",
+                ))
+            else:
+                report.passed.append(CompatibilityIssue(
+                    check_name="Thermal Dissipation (Tj)",
+                    severity=CheckSeverity.PASS,
+                    parts_involved=[mpn],
+                    message=(
+                        f"✓ {mpn} thermal check passed: Tj ~{t_j:.1f}°C (Max {t_max}°C). "
+                        f"(Pd: {pd_watts*1000:.0f}mW, θJA: {theta_ja}°C/W)."
+                    ),
+                ))
+                
+        if not checked_any:
+            report.passed.append(CompatibilityIssue(
+                check_name="Thermal Dissipation (Tj)",
+                severity=CheckSeverity.PASS,
+                parts_involved=[p.get("mpn", "?") for p in parts],
+                message="No components with known thermal resistance (θJA) to perform analysis.",
             ))
 
     def _check_can_compatibility(

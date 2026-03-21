@@ -342,10 +342,48 @@ async def architect_peer_review(request: Dict):
         ranked = ranking_engine.rank(candidates, spec)
         top_candidates = [dict(r[0]) for r in ranked[:3]]
         
+        target_part_id = request.get("part_id")
+        if target_part_id:
+            target_part = await db_ops.get_part_by_id(UUID(target_part_id))
+            if target_part:
+                # Normalise object
+                part_keys = {'id', 'mpn', 'manufacturer', 'family', 'status', 'package_family', 'package_name', 'pin_count', 'temp_min_c', 'temp_max_c', 'datasheet_url', 'created_at', 'updated_at'}
+                target_part['specs'] = {k: v for k, v in target_part.items() if k not in part_keys}
+                # Prepend the targeted part so the LLM thinks it's the Primary Candidate
+                top_candidates.insert(0, target_part)
+        
         review = await rigorous_explainer.generate_architect_review(spec, top_candidates)
         return review
     except Exception as e:
         logger.error(f"Peer review error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/exhaustive-review")
+async def exhaustive_parameter_review(request: Dict):
+    """
+    Triggers an exhaustive parameter-by-parameter AI evaluation against user requirements.
+    """
+    try:
+        req_id = request.get("req_id")
+        part_id = request.get("part_id")
+        
+        if not req_id or not part_id:
+            raise HTTPException(status_code=400, detail="Missing req_id or part_id.")
+            
+        spec = await db_ops.get_requirement_spec(UUID(req_id))
+        if not spec:
+            raise HTTPException(status_code=404, detail="Requirement spec not found.")
+            
+        part = await db_ops.get_part_by_id(UUID(part_id))
+        if not part:
+            raise HTTPException(status_code=404, detail="Component not found.")
+            
+        review = await rigorous_explainer.generate_exhaustive_parameter_review(spec, part)
+        return review
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Exhaustive review error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/bom/check")
@@ -369,8 +407,8 @@ async def check_bom_compatibility(request: Dict):
                     # Normalise: nest MCU fields under 'specs' for bom_checker
                     part_keys = {'id', 'mpn', 'manufacturer', 'family', 'status',
                                  'package_family', 'package_name', 'pin_count',
-                                 'temp_min_c', 'temp_max_c', 'datasheet_url',
-                                 'created_at', 'updated_at'}
+                                 'theta_ja_c_w', 'temp_min_c', 'temp_max_c', 
+                                 'datasheet_url', 'created_at', 'updated_at'}
                     specs = {k: v for k, v in part.items() if k not in part_keys}
                     part['specs'] = specs
                     parts.append(part)

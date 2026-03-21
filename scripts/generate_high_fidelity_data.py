@@ -38,10 +38,14 @@ async def generate_data(num_parts=100):
         
         created_at = (datetime.now() - timedelta(days=random.randint(1, 1000))).isoformat()
         
+        # Package thermal resistance mock logic
+        theta_ja_c_w = round(random.uniform(25.0, 85.0), 1)
+        if "BGA" in package_name: theta_ja_c_w -= 15.0
+        
         # Insert into parts
         cursor.execute(
-            "INSERT INTO parts (id, mpn, manufacturer, family, status, package_family, package_name, pin_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (part_id, mpn, mfg, family, status, package_family, package_name, pin_count, created_at)
+            "INSERT INTO parts (id, mpn, manufacturer, family, status, package_family, package_name, pin_count, theta_ja_c_w, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (part_id, mpn, mfg, family, status, package_family, package_name, pin_count, theta_ja_c_w, created_at)
         )
         
         # Generate MCU Specs
