@@ -1,38 +1,74 @@
-# HardwareGenius
+# Silicon-Pilot (HardwareGenius)
 
-**Engineering-Grade Component Selection Engine**
+**Engineering-Grade MCU Selection Engine with Explainable AI**
 
-HardwareGenius is a system designed to ingest raw datasheet PDFs and serve deep parametric data for electronic components. It moves beyond simple "filters" to provide architectural validation, intelligent recommendations, and cross-compatibility checks.
+Silicon-Pilot ingests real STM32 datasheet PDFs and provides deep parametric analysis, architectural validation, exhaustive parameter traceability, and cross-component compatibility checks.
 
-## ✨ Implemented Dream Specs
-We have recently implemented major architectural "Dream Specs" to elevate this from a basic search engine to a peer-review tool:
-1. **AI Peer Review (Architect's Notes)**: `POST /api/peer-review` — Triggers an LLM to review the top component candidate just like a senior hardware engineer, warning about missing constraints, overkill selections, and providing a color-coded "pass/fail/warn" verdict.
-2. **Smart BOM Compatibility Checking**: `POST /api/bom/check` — A rules-based engine that cross-references all components added to a BOM cart. It checks voltage level overlaps (e.g., 3.3V vs 1.8V), power supply adequacy (LDO output vs MCU drain), interface scaling, and CAN transceiver pairings.
+---
+
+## ✅ Implemented Dream Specs
+
+| # | Dream Spec | Status | Endpoint / Module |
+|---|---|---|---|
+| DS1 | **Context-Aware Component Selection** — re-rank based on user context (budget, volume, ecosystem) | ❌ **Not implemented** | — |
+| DS2 | **Smart BOM Compatibility Checking** — cross-validates entire board for voltage, power, interface conflicts | ✅ Done | `POST /api/bom/check` → `solver/bom_checker.py` |
+| DS3 | **LLM-Driven Config Generation (CubeMX / Firmware)** — generate `.ioc` / C scaffolding | ⚠️ **Stub only** — static rules, no LLM, no `.ioc` output | `architecture/config_generator.py` |
+| DS4 | **AI Peer Review (Architect's Notes)** — senior engineer sanity-check with pass/warn/fail verdict | ✅ Done | `POST /api/peer-review` → `llm/rigorous_explainer.py` |
+
+### Additional Features (beyond original Dream Specs)
+| Feature | Status | Details |
+|---|---|---|
+| **Thermal Dissipation Analysis** | ✅ Done | θJA per package, power dissipation, derating curves in peer-review |
+| **Exhaustive Datasheet Parameter Verification** | ✅ Done | 587 parameters extracted from STM32H743 PDF; all shown in UI with section + page provenance |
+| **Deep PDF Extraction Pipeline** | ✅ Done | `ingestion/deep_datasheet_extractor.py` extracts DC, AC, thermal, current, clock, GPIO, features |
+| **Explainable AI UI (parameter-by-parameter)** | ✅ Done | Full modal with section headers, pg. badges, fit score legend |
+
+---
 
 ## 🚀 Quick Start
 
-To set up the database, seed initial data, and run the ingestion pipeline:
-
 ```bash
-# Windows
-$env:DATABASE_URL='postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius'; python scripts/run_pipeline.py
+# Start with mock SQLite (no Postgres needed)
+LOCAL_LLM=true DEMO_MODE=true python server.py
 
-# Linux/Mac
+# Access UI at:
+http://localhost:8000
+```
+
+**To extract all datasheet parameters into DB:**
+```bash
+source .venv/bin/activate
+python scripts/populate_datasheet_params.py
+```
+
+**To run with real Postgres:**
+```bash
 export DATABASE_URL='postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius'
 python scripts/run_pipeline.py
+python server.py
 ```
+
+---
 
 ## 📖 Documentation
 
-*   **[Features & Capabilities](features.md)**: Exhaustive list of all supported components and system features.
-*   **[System Workflow](system_workflow.md)**: Detailed step-by-step explanation of ingestion and runtime flows.
-*   **[Architecture & Design](architecture.md)**: High-level system design and component breakdown.
-*   **[Remaining Tasks](remaining.md)**: Roadmap of pending features (Context-Aware Ranking, CubeMX generation).
+| Doc | Purpose |
+|---|---|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, component breakdown, data flow |
+| [TODO_DREAM_SPECS.md](TODO_DREAM_SPECS.md) | Exact gaps for remaining dream specs |
+| [workflow.md](workflow.md) | Detailed ingestion and runtime workflow |
+| [database/schema.sql](database/schema.sql) | Full PostgreSQL schema with all tables |
 
-## 💻 Usage
+---
 
-Start the API Server (Supports both Mock SQLite and Production PostgreSQL via UI hot-swapping):
-```bash
-python server.py
-```
-Access the UI at `http://localhost:8000`.
+## 🔑 Key API Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /spec/from_text` | Parse natural language requirements |
+| `POST /recommend` | Get ranked MCU candidates |
+| `POST /api/peer-review` | AI Architect's Review (DS4) |
+| `POST /api/exhaustive-review` | Parameter-by-parameter verification with PDF provenance |
+| `POST /api/bom/check` | BOM cross-compatibility check (DS2) |
+| `POST /api/debate` | Head-to-head AI debate between two candidates |
+| `POST /api/compare` | Structured comparison matrix |
