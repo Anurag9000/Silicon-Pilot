@@ -6,22 +6,19 @@ Silicon-Pilot ingests real STM32 datasheet PDFs and provides deep parametric ana
 
 ---
 
-## ✅ Implemented Dream Specs
+## ✅ Implemented Features
 
-| # | Dream Spec | Status | Endpoint / Module |
-|---|---|---|---|
-| DS1 | **Context-Aware Component Selection** — re-rank based on user context (budget, volume, ecosystem) | ❌ **Not implemented** | — |
-| DS2 | **Smart BOM Compatibility Checking** — cross-validates entire board for voltage, power, interface conflicts | ✅ Done | `POST /api/bom/check` → `solver/bom_checker.py` |
-| DS3 | **LLM-Driven Config Generation (CubeMX / Firmware)** — generate `.ioc` / C scaffolding | ⚠️ **Stub only** — static rules, no LLM, no `.ioc` output | `architecture/config_generator.py` |
-| DS4 | **AI Peer Review (Architect's Notes)** — senior engineer sanity-check with pass/warn/fail verdict | ✅ Done | `POST /api/peer-review` → `llm/rigorous_explainer.py` |
-
-### Additional Features (beyond original Dream Specs)
-| Feature | Status | Details |
-|---|---|---|
-| **Thermal Dissipation Analysis** | ✅ Done | θJA per package, power dissipation, derating curves in peer-review |
-| **Exhaustive Datasheet Parameter Verification** | ✅ Done | 587 parameters extracted from STM32H743 PDF; all shown in UI with section + page provenance |
-| **Deep PDF Extraction Pipeline** | ✅ Done | `ingestion/deep_datasheet_extractor.py` extracts DC, AC, thermal, current, clock, GPIO, features |
-| **Explainable AI UI (parameter-by-parameter)** | ✅ Done | Full modal with section headers, pg. badges, fit score legend |
+| Feature | Endpoint / Module |
+|---|---|
+| **Natural Language Requirements Parsing** | `POST /spec/from_text` |
+| **ML-Ranked MCU Candidate Recommendations** | `POST /recommend` |
+| **AI Peer Review (Architect's Notes)** — senior engineer sanity check with pass/warn/fail verdict | `POST /api/peer-review` |
+| **Smart BOM Compatibility Checking** — voltage, power, interface cross-validation | `POST /api/bom/check` |
+| **Head-to-Head AI Debate** — two candidates argued by AI advocates | `POST /api/debate` |
+| **Comparison Matrix** — structured parameter table across candidates | `POST /api/compare` |
+| **Thermal Dissipation Analysis** — θJA checks, derating, package thermal constraints | Built into peer-review |
+| **Deep PDF Parameter Extraction** — 587 params extracted from STM32H743 datasheet alone | `ingestion/deep_datasheet_extractor.py` |
+| **Exhaustive Parameter Verification UI** — every param, by section, with PDF page provenance | `POST /api/exhaustive-review` |
 
 ---
 
@@ -55,20 +52,5 @@ python server.py
 | Doc | Purpose |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, component breakdown, data flow |
-| [TODO_DREAM_SPECS.md](TODO_DREAM_SPECS.md) | Exact gaps for remaining dream specs |
 | [workflow.md](workflow.md) | Detailed ingestion and runtime workflow |
 | [database/schema.sql](database/schema.sql) | Full PostgreSQL schema with all tables |
-
----
-
-## 🔑 Key API Endpoints
-
-| Endpoint | Purpose |
-|---|---|
-| `POST /spec/from_text` | Parse natural language requirements |
-| `POST /recommend` | Get ranked MCU candidates |
-| `POST /api/peer-review` | AI Architect's Review (DS4) |
-| `POST /api/exhaustive-review` | Parameter-by-parameter verification with PDF provenance |
-| `POST /api/bom/check` | BOM cross-compatibility check (DS2) |
-| `POST /api/debate` | Head-to-head AI debate between two candidates |
-| `POST /api/compare` | Structured comparison matrix |
