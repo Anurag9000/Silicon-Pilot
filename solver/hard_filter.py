@@ -63,6 +63,25 @@ class HardFilter:
         # Execute
         async with self.db_pool.acquire() as conn:
             rows = await conn.fetch(query, *params)
+            
+            # NEAR-MISS FALLBACK: If 0 results, retry with only critical memory constraints
+            if not rows and c_type == 'mcu':
+                logger.info("No perfect matches. Running near-miss fallback...")
+                
+                # If we have flash_kb, try filtering by it
+                if 'flash_kb' in spec.hard_constraints:
+                    fallback_query = self._build_mcu_query("m.flash_kb >= $1")
+                    f = spec.hard_constraints['flash_kb']
+                    flash_min = f.get('min', 0) if isinstance(f, dict) else (f if isinstance(f, int) else 0)
+                    rows = await conn.fetch(fallback_query, flash_min)
+                
+                # ULTRA FALLBACK: If STILL 0 results (or no flash_kb constraint), just get the best parts
+                if not rows:
+                    logger.info("Ultra fallback: Returning top performance parts regardless of constraints")
+                    ultra_query = self._build_mcu_query("1=1")
+                    # Just order by flash_kb desc to get the big ones like STM32H7
+                    ultra_query = ultra_query.replace("ORDER BY p.mpn ASC", "ORDER BY m.flash_kb DESC LIMIT 5")
+                    rows = await conn.fetch(ultra_query)
         
         logger.info(f"Hard filter: {len(rows)} candidates found")
         

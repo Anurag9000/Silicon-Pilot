@@ -1,0 +1,155 @@
+{
+  "timestamp": "2026-03-21 22:49:21",
+  "datasheets": [
+    {
+      "name": "STM32F030",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f030f4.pdf",
+      "local_path": "data/stm32_datasheets/STM32F030_datasheet.pdf"
+    },
+    {
+      "name": "STM32F072",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f072c8.pdf",
+      "local_path": "data/stm32_datasheets/STM32F072_datasheet.pdf"
+    },
+    {
+      "name": "STM32F103",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f103c8.pdf",
+      "local_path": "data/stm32_datasheets/STM32F103_datasheet.pdf"
+    },
+    {
+      "name": "STM32F105",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f105r8.pdf",
+      "local_path": "data/stm32_datasheets/STM32F105_datasheet.pdf"
+    },
+    {
+      "name": "STM32F205",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f205rg.pdf",
+      "local_path": "data/stm32_datasheets/STM32F205_datasheet.pdf"
+    },
+    {
+      "name": "STM32F303",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f303vc.pdf",
+      "local_path": "data/stm32_datasheets/STM32F303_datasheet.pdf"
+    },
+    {
+      "name": "STM32F401",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f401ce.pdf",
+      "local_path": "data/stm32_datasheets/STM32F401_datasheet.pdf"
+    },
+    {
+      "name": "STM32F405",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f405rg.pdf",
+      "local_path": "data/stm32_datasheets/STM32F405_datasheet.pdf"
+    },
+    {
+      "name": "STM32F407",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f407vg.pdf",
+      "local_path": "data/stm32_datasheets/STM32F407_datasheet.pdf"
+    },
+    {
+      "name": "STM32F411",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f411ce.pdf",
+      "local_path": "data/stm32_datasheets/STM32F411_datasheet.pdf"
+    },
+    {
+      "name": "STM32F446",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f446re.pdf",
+      "local_path": "data/stm32_datasheets/STM32F446_datasheet.pdf"
+    },
+    {
+      "name": "STM32F746",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f746ng.pdf",
+      "local_path": "data/stm32_datasheets/STM32F746_datasheet.pdf"
+    },
+    {
+      "name": "STM32F767",
+      "url": "https://www.st.com/resource/en/datasheet/stm32f767zi.pdf",
+      "local_path": "data/stm32_datasheets/STM32F767_datasheet.pdf"
+    },
+    {
+      "name": "STM32G030",
+      "url": "https://www.st.com/resource/en/datasheet/stm32g030f6.pdf",
+      "local_path": "data/stm32_datasheets/STM32G030_datasheet.pdf"
+    },
+    {
+      "name": "STM32G071",
+      "url": "https://www.st.com/resource/en/datasheet/stm32g071rb.pdf",
+      "local_path": "data/stm32_datasheets/STM32G071_datasheet.pdf"
+    },
+    {
+      "name": "STM32G431",
+      "url": "https://www.st.com/resource/en/datasheet/stm32g431cb.pdf",
+      "local_path": "data/stm32_datasheets/STM32G431_datasheet.pdf"
+    },
+    {
+      "name": "STM32G474",
+      "url": "https://www.st.com/resource/en/datasheet/stm32g474re.pdf",
+      "local_path": "data/stm32_datasheets/STM32G474_datasheet.pdf"
+    },
+    {
+      "name": "STM32H503",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h503cb.pdf",
+      "local_path": "data/stm32_datasheets/STM32H503_datasheet.pdf"
+    },
+    {
+      "name": "STM32H730",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h730ab.pdf",
+      "local_path": "data/stm32_datasheets/STM32H730_datasheet.pdf"
+    },
+    {
+      "name": "STM32H743",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h743zi.pdf",
+      "local_path": "data/stm32_datasheets/STM32H743_datasheet.pdf"
+    },
+    {
+      "name": "STM32H750",
+      "url": "https://www.st.com/resource/en/datasheet/stm32h750vb.pdf",
+      "local_path": "data/stm32_datasheets/STM32H750_datasheet.pdf"
+    },
+    {
+      "name": "STM32L031",
+      "url": "https://www.st.com/resource/en/datasheet/stm32l031f4.pdf",
+      "local_path": "data/stm32_datasheets/STM32L031_datasheet.pdf"
+    },
+    {
+      "name": "STM32L051",
+      "url": "https://www.st.com/resource/en/datasheet/stm32l051c6.pdf",
+      "local_path": "data/stm32_datasheets/STM32L051_datasheet.pdf"
+    },
+    {
+      "name": "STM32L432",
+      "url": "https://www.st.com/resource/en/datasheet/stm32l432kc.pdf",
+      "local_path": "data/stm32_datasheets/STM32L432_datasheet.pdf"
+    },
+    {
+      "name": "STM32L476",
+      "url": "https://www.st.com/resource/en/datasheet/stm32l476re.pdf",
+      "local_path": "data/stm32_datasheets/STM32L476_datasheet.pdf"
+    },
+    {
+      "name": "STM32L4R5",
+      "url": "https://www.st.com/resource/en/datasheet/stm32l4r5vi.pdf",
+      "local_path": "data/stm32_datasheets/STM32L4R5_datasheet.pdf"
+    },
+    {
+      "name": "STM32L552",
+      "url": "https://www.st.com/resource/en/datasheet/stm32l552cc.pdf",
+      "local_path": "data/stm32_datasheets/STM32L552_datasheet.pdf"
+    },
+    {
+      "name": "STM32U575",
+      "url": "https://www.st.com/resource/en/datasheet/stm32u575cg.pdf",
+      "local_path": "data/stm32_datasheets/STM32U575_datasheet.pdf"
+    },
+    {
+      "name": "STM32WB55",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wb55cc.pdf",
+      "local_path": "data/stm32_datasheets/STM32WB55_datasheet.pdf"
+    },
+    {
+      "name": "STM32WL55",
+      "url": "https://www.st.com/resource/en/datasheet/stm32wl55cc.pdf",
+      "local_path": "data/stm32_datasheets/STM32WL55_datasheet.pdf"
+    }
+  ]
+}

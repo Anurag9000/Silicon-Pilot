@@ -62,8 +62,38 @@ class Database:
     async def disconnect(self):
         """Close connection pool"""
         if self.pool:
-            await self.pool.close()
+            if hasattr(self.pool, 'close') and os.path.exists("data/hardwaregenius_mock.db") and not hasattr(self.pool, 'acquire'):
+                 # Mock pool close is sync
+                 self.pool.close()
+            else:
+                 await self.pool.close()
             logger.info("Database connection pool closed")
+
+    async def switch_to_production(self, postgres_url: str):
+        """Hot-swap the active database from Mock to Production"""
+        import asyncio
+        logger.info("INITIATING HOT-SWAP: Switching to Production PostgreSQL...")
+        
+        # 1. Create new production pool
+        new_pool = await asyncpg.create_pool(postgres_url)
+        
+        # 2. Verify connection
+        async with new_pool.acquire() as conn:
+            await conn.execute("SELECT 1")
+            
+        # 3. Swap the active pool
+        old_pool = self.pool
+        self.pool = new_pool
+        
+        # 4. Cleanup old pool
+        if old_pool:
+            if hasattr(old_pool, 'close') and not hasattr(old_pool, 'acquire'):
+                old_pool.close() # Mock is sync
+            else:
+                await old_pool.close() # asyncpg is async
+                
+        logger.info("HOT-SWAP COMPLETE: Backend is now rewired to Production Database.")
+        return True
     
     async def execute(self, query: str, *args):
         """Execute a query"""

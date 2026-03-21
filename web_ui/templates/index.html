@@ -172,7 +172,26 @@
 
             <div class="card">
                 <h2>Admin</h2>
-                <button onclick="triggerIngestion()" style="background-color: #475569;">Trigger Ingestion</button>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <button id="ingestBtn" onclick="triggerIngestion('mock')" style="background-color: #475569; flex:1;">Restore Mock DB</button>
+                    <button id="prodIngestBtn" onclick="triggerIngestion('production')" style="background-color: #1e293b; flex:1;">Run Real Pipeline</button>
+                </div>
+                
+                <div id="swapWrapper" style="display:none; margin-top:1rem; padding:1rem; background:#ecfdf5; border:1px solid #10b981; border-radius:6px;">
+                    <p style="margin:0 0 0.5rem 0; font-size:0.85rem; color:#065f46; font-weight:600;">✓ Production Data Ready</p>
+                    <button onclick="hotSwap()" style="width:100%; background:#10b981; color:white; border:none; padding:0.5rem; border-radius:4px; cursor:pointer; font-weight:600;">Hot-Swap to Production</button>
+                </div>
+                
+                <div id="progressWrapper" style="display:none; margin-top:1rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem; font-size:0.8rem;">
+                        <span id="progressMsg">Restoring...</span>
+                        <span id="progressPct">0%</span>
+                    </div>
+                    <div style="width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
+                        <div id="progressBar" style="width:0%; height:100%; background:var(--primary); transition:width 0.3s;"></div>
+                    </div>
+                </div>
+                
                 <div id="adminStatus" style="margin-top: 0.5rem; font-size: 0.9rem; color: #64748b;"></div>
             </div>
         </div>
@@ -180,12 +199,38 @@
         <!-- Right Column: Results -->
         <div class="right-col">
             <div class="card">
-                <h2>Recommended Components</h2>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h2 style="margin:0;">Recommended Components</h2>
+                    <button id="matrixBtn" onclick="generateMatrix()" style="display:none; background:var(--primary); color:white; border:none; padding:0.5rem 1rem; border-radius:6px; cursor:pointer; font-weight:600;">Generate Rigorous Matrix</button>
+                </div>
                 <div id="resultsList">
                     <p style="color: #64748b; text-align: center;">enter requirements to see candidates</p>
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- BOM COMPATIBILITY SECTION -->
+    <div class="card">
+        <h2>🧩 BOM Compatibility Checker</h2>
+        <p style="color:#64748b;font-size:0.9rem;margin-top:0;">Add components from the results above to build a Bill of Materials and check for compatibility issues.</p>
+        <div id="bom-empty" style="color:#94a3b8;font-style:italic;padding:1rem 0;">No parts added yet. Click "🧩 Add to BOM" on any result card.</div>
+        <div id="bom-parts" style="display:none;">
+            <table id="bom-table" style="width:100%;border-collapse:collapse;margin-bottom:1rem;font-size:0.9rem;">
+                <thead><tr style="background:#f1f5f9;">
+                    <th style="padding:0.5rem;text-align:left;">MPN</th>
+                    <th style="padding:0.5rem;text-align:left;">Inferred Type</th>
+                    <th style="padding:0.5rem;text-align:center;">Remove</th>
+                </tr></thead>
+                <tbody id="bom-rows"></tbody>
+            </table>
+            <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                <button id="bom-check-btn" onclick="checkBOMCompatibility()" style="padding:0.5rem 1.25rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.9rem;">⚡ Check Compatibility</button>
+                <button onclick="bomList.clear();renderBOMTable()" style="padding:0.5rem 1rem;background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:8px;cursor:pointer;font-size:0.9rem;">🗑 Clear BOM</button>
+                <span id="bom-count-badge" style="background:#e0f2fe;color:#0369a1;padding:0.25rem 0.75rem;border-radius:12px;font-size:0.85rem;font-weight:600;">0 parts</span>
+            </div>
+        </div>
+        <div id="bom-report" style="margin-top:1.25rem;"></div>
     </div>
 
     <!-- PIN MUX SECTION -->
@@ -224,10 +269,16 @@
 
     <script>
         let currentSpecId = null;
+        let topCandidateId = null;
 
         async function parseRequirements() {
             const text = document.getElementById('intentInput').value;
             if (!text) return;
+
+            // CLEAR STATE IMMEDIATELY
+            document.getElementById('resultsList').innerHTML = '<p style="text-align:center;">Analyzing requirements... (this may take a few minutes for deep reasoning)</p>';
+            document.getElementById('pm-results').textContent = "Waiting for backend analysis...";
+            topCandidateId = null;
 
             setLoading(true);
             try {
@@ -241,20 +292,28 @@
                 currentSpecId = data.spec_id;
                 renderSpec(data.spec);
 
-                // If parses immediately to candidates, fetch them
-                if (data.candidates_count > 0) {
-                    await fetchRecommendations();
-                }
+                // Re-fetch recommendations
+                await fetchRecommendations();
+                
+                // AUTO-SELECT TOP PART FOR USER
+                setTimeout(() => {
+                    const firstCard = document.querySelector('.part-card');
+                    if (firstCard) {
+                        console.log("Found candidate! Auto-solving...");
+                        firstCard.click();
+                        solvePinMux();
+                    }
+                }, 1000);
 
                 // If questions, show them
-                if (data.questions && data.questions.questions.length > 0) {
-                    renderQuestions(data.questions.questions);
+                if (data.questions && data.questions.length > 0) {
+                    renderQuestions(data.questions);
                 } else {
                     document.getElementById('questionsCard').style.display = 'none';
                 }
 
             } catch (e) {
-                alert('Error: ' + e.message);
+                document.getElementById('resultsList').innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
             }
             setLoading(false);
         }
@@ -266,33 +325,118 @@
                 body: JSON.stringify({ spec_id: currentSpecId })
             });
             const data = await res.json();
+            if (data.candidates && data.candidates.length > 0) {
+                topCandidateId = data.candidates[0].part.id;
+            }
             renderCandidates(data.candidates);
         }
 
-        async function triggerIngestion() {
-            const btn = event.target;
+        async function triggerIngestion(mode) {
+            const btn = document.getElementById('ingestBtn');
+            const pBtn = document.getElementById('prodIngestBtn');
+            const wrapper = document.getElementById('progressWrapper');
+            const bar = document.getElementById('progressBar');
+            const pct = document.getElementById('progressPct');
+            const msg = document.getElementById('progressMsg');
+            const swapWrapper = document.getElementById('swapWrapper');
+            
             btn.disabled = true;
-            document.getElementById('adminStatus').innerText = "Starting ingestion...";
-            try {
-                const res = await fetch('/admin/ingest', { method: 'POST' });
-                const data = await res.json();
-                document.getElementById('adminStatus').innerText = "✓ " + data.status;
-            } catch (e) {
-                document.getElementById('adminStatus').innerText = "Error: " + e.message;
+            pBtn.disabled = true;
+            wrapper.style.display = 'block';
+            swapWrapper.style.display = 'none';
+            bar.style.width = '1%';
+            pct.innerText = '1%';
+            msg.innerText = "Initializing...";
+            
+            // Start the ingestion via standard POST
+            await fetch(`/admin/ingest?mode=${mode}`, { method: 'POST' });
+            
+            console.log("Starting SSE stream for mode:", mode);
+            
+            // Listen for progress via SSE
+            const eventSource = new EventSource('/api/ingest/status');
+            
+            eventSource.onopen = () => {
+                console.log("SSE Connection opened.");
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("SSE update:", data);
+                    
+                    if (data.percent) {
+                        bar.style.width = data.percent + '%';
+                        pct.innerText = data.percent + '%';
+                    }
+                    if (data.message) {
+                        msg.innerText = data.message;
+                    }
+                    
+                    if (data.status === 'complete' || data.status === 'error') {
+                        console.log("SSE task finished:", data.status);
+                        eventSource.close();
+                        btn.disabled = false;
+                        pBtn.disabled = false;
+                        
+                        if (data.status === 'complete') {
+                            if (mode === 'production') {
+                                swapWrapper.style.display = 'block';
+                            } else {
+                                // FORCE BACKEND REWIRE TO MOCK
+                                fetch('/api/ingest/reset_mock', { method: 'POST' })
+                                    .then(() => console.log("Backend rewired to Mock"));
+                                setTimeout(() => wrapper.style.display = 'none', 3000);
+                            }
+                        }                    }
+                } catch (err) {
+                    console.error("Error parsing SSE data:", err);
+                }
+            };
+            
+            eventSource.onerror = (err) => {
+                console.error("SSE Error occurred:", err);
+                // Don't close immediately if it's just a transient glitch
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    msg.innerText = "Connection lost. Retrying...";
+                    // Backend has 'retry: 1000' so the browser will try to reconnect automatically
+                }
+            };
+        }
+
+        async function hotSwap() {
+            const res = await fetch('/api/ingest/swap', { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'success') {
+                alert("REWIRED: System is now running on Real Production Data!");
+                document.getElementById('swapWrapper').style.display = 'none';
+                document.getElementById('progressWrapper').style.display = 'none';
+            } else {
+                alert("Hot-swap failed: " + data.detail);
             }
-            setTimeout(() => btn.disabled = false, 2000);
         }
 
         function renderSpec(spec) {
+            if (!spec) return;
             const list = document.getElementById('specList');
             let html = '';
 
             // Hard constraints
-            for (const [k, v] of Object.entries(spec.hard_constraints)) {
-                html += `<div class="spec-item"><span>${k}</span><strong>${v}</strong></div>`;
+            if (spec.hard_constraints) {
+                for (const [k, v] of Object.entries(spec.hard_constraints)) {
+                    let displayValue = v;
+                    if (typeof v === 'object' && v !== null) {
+                        if (v.min !== undefined && v.max !== undefined) displayValue = `${v.min} - ${v.max}`;
+                        else if (v.min !== undefined) displayValue = `min ${v.min}`;
+                        else if (v.max !== undefined) displayValue = `max ${v.max}`;
+                        else if (Array.isArray(v)) displayValue = v.join(', ');
+                        else displayValue = JSON.stringify(v);
+                    }
+                    html += `<div class="spec-item"><span>${k}</span><strong>${displayValue}</strong></div>`;
+                }
             }
             // Unknowns
-            if (spec.unknowns.length > 0) {
+            if (spec.unknowns && spec.unknowns.length > 0) {
                 html += `<div class="spec-item" style="color: #ef4444;"><span>Missing</span><strong>${spec.unknowns.join(', ')}</strong></div>`;
             }
 
@@ -301,8 +445,9 @@
         }
 
         function renderQuestions(questions) {
+            if (!questions || !questions.questions || questions.questions.length === 0) return;
             const list = document.getElementById('questionsList');
-            list.innerHTML = questions.map((q, idx) => `
+            list.innerHTML = questions.questions.map((q, idx) => `
                 <div style="margin-bottom: 1rem;">
                     <label style="display:block; font-weight:600; margin-bottom:0.25rem;">${q.question_text}</label>
                     <small style="color:#64748b; display:block; margin-bottom:0.5rem;">${q.why_asking}</small>
@@ -319,32 +464,294 @@
                 return;
             }
 
-            container.innerHTML = candidates.map(c => {
-                // Generate evidence items
-                const evidenceHtml = c.evidence_ids.map(eid => `
+            let topId = '';
+            container.innerHTML = candidates.map((c, idx) => {
+                const evidenceHtml = (c.evidence_ids || []).map(eid => `
                     <div style="margin-top:0.5rem; font-size:0.85em;">
                         <a href="/evidence/${eid}/content" target="_blank" style="color:var(--primary);">View Evidence Snippet</a>
                     </div>
                 `).join('');
 
+                const partId = c.part ? c.part.id : '';
+                const mpn = c.part ? c.part.mpn : (c.mpn || 'Unknown');
+                const ram = c.specs.sram_kb || c.specs.ram_kb || '—';
+                const can = c.specs.can_count != null ? c.specs.can_count : '—';
+                const mhz = c.specs.max_mhz || '—';
+                const flash = c.specs.flash_kb || '—';
+                const scorePercent = (c.total_score * 100).toFixed(0);
+                const cost = c.specs.cost_usd ? `$${c.specs.cost_usd.toFixed(2)}` : '—';
+                const isTop = idx === 0;
+                if (isTop) topId = partId;
+
                 return `
-                <div class="part-card">
+                <div class="part-card${isTop ? ' top-pick' : ''}" onclick="selectPart('${partId}', '${mpn}')" style="cursor: pointer; ${isTop ? 'border: 2px solid #6366f1;' : ''}">
                     <div class="part-header">
-                        <span class="mpn">${c.mpn}</span>
-                        <span class="score">${c.total_score.toFixed(1)}</span>
+                        <span class="mpn">${isTop ? '🏆 ' : ''}${mpn}</span>
+                        <span class="score" style="background:${scorePercent >= 70 ? '#dcfce7; color:#166534' : scorePercent >= 50 ? '#fef9c3; color:#92400e' : '#fee2e2; color:#991b1b'}; padding:0.2rem 0.5rem; border-radius:12px; font-weight:700;">${scorePercent}%</span>
                     </div>
                     <div style="color: #475569; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                        ${c.manufacturer} | ${c.family || ''} | ${c.specs.package_family || 'PKG?'}
+                        ${c.part ? c.part.manufacturer : (c.manufacturer || '')} | ${c.part ? (c.part.family || '') : (c.family || '')}
                     </div>
-                    <div class="specs-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem; font-size:0.9rem;">
-                        <div>Flash: ${c.specs.flash_kb}KB</div>
-                        <div>RAM: ${c.specs.sram_kb}KB</div>
-                        <div>CAN: ${c.specs.can_count}</div>
-                        <div>Freq: ${c.specs.max_mhz}MHz</div>
+                    <div class="specs-grid" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:0.5rem; font-size:0.85rem; background:#f8fafc; padding:0.5rem; border-radius:6px; margin-bottom:0.5rem;">
+                        <div>⚡ ${mhz}MHz</div>
+                        <div>💾 Flash: ${flash}KB</div>
+                        <div>🧠 RAM: ${ram}KB</div>
+                        <div>🔌 CAN×${can}</div>
+                        <div>💰 ${cost}</div>
+                        <div>${c.specs.has_fpu ? '✅ FPU' : '❌ FPU'}</div>
+                    </div>
+                    <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap:wrap;">
+                        <button onclick="event.stopPropagation(); conductDebate('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 4px; cursor: pointer;">⚔️ Debate</button>
+                        <button onclick="event.stopPropagation(); addToComparison('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #dcfce7; color: #166534; border: 1px solid #86efac; border-radius: 4px; cursor: pointer;">📊 Matrix</button>
+                        <button onclick="event.stopPropagation(); addToBOM('${partId}', '${mpn}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 4px; cursor: pointer;">🧩 Add to BOM</button>
+                        ${isTop ? `<button onclick="event.stopPropagation(); peerReview()" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #ede9fe; color: #5b21b6; border: 1px solid #a78bfa; border-radius: 4px; cursor: pointer;">🔍 Architect Review</button>` : ''}
                     </div>
                     ${evidenceHtml ? `<div class="evidence-viewer"><strong>Evidence:</strong>${evidenceHtml}</div>` : ''}
                 </div>
             `}).join('');
+            topCandidateId = topId;
+        }
+
+        async function conductDebate(altId) {
+            if (!topCandidateId) {
+                alert("Please analyze requirements first to find a top candidate.");
+                return;
+            }
+            if (topCandidateId === altId) {
+                alert("This is already the top-ranked candidate. Try debating against another part.");
+                return;
+            }
+            
+            setLoading(true);
+            try {
+                const response = await fetch('/api/debate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        spec_id: currentSpecId,
+                        top_part_id: topCandidateId,
+                        alt_part_id: altId
+                    })
+                });
+                const data = await response.json();
+                showDebateModal(data.debate);
+            } catch (e) {
+                alert("Debate failed: " + e.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function showDebateModal(turns) {
+            const modal = document.createElement('div');
+            modal.style = "position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000;";
+            modal.innerHTML = `
+                <div style="background:white; padding:2rem; border-radius:8px; max-width:800px; max-height:80vh; overflow-y:auto; position:relative;">
+                    <button onclick="this.parentElement.parentElement.remove()" style="position:absolute; top:1rem; right:1rem;">✕</button>
+                    <h2 style="margin-top:0;">Rigorous Architectural Debate</h2>
+                    ${turns.map(t => `
+                        <div style="margin-bottom:1.5rem; border-left:4px solid ${t.architect === 'Architect A' ? '#3b82f6' : '#ef4444'}; padding-left:1rem;">
+                            <strong style="color:var(--primary);">${t.architect}</strong>
+                            <p style="margin-top:0.25rem; font-size:0.95rem; line-height:1.5;">${t.argument}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        // ── BOM Builder ──────────────────────────────────────────────────
+        // bomList: Map of partId -> { mpn }
+        const bomList = new Map();
+
+        function addToBOM(id, mpn) {
+            if (bomList.has(id)) {
+                showToast(`${mpn} already in BOM`);
+                return;
+            }
+            bomList.set(id, { mpn });
+            renderBOMTable();
+            showToast(`✓ ${mpn} added to BOM (${bomList.size} parts)`);
+        }
+
+        function renderBOMTable() {
+            const empty = document.getElementById('bom-empty');
+            const parts = document.getElementById('bom-parts');
+            const badge = document.getElementById('bom-count-badge');
+            const tbody = document.getElementById('bom-rows');
+
+            if (bomList.size === 0) {
+                empty.style.display = 'block';
+                parts.style.display = 'none';
+                badge.textContent = '0 parts';
+                document.getElementById('bom-report').innerHTML = '';
+                return;
+            }
+            empty.style.display = 'none';
+            parts.style.display = 'block';
+            badge.textContent = `${bomList.size} part${bomList.size > 1 ? 's' : ''}`;
+
+            tbody.innerHTML = [...bomList.entries()].map(([id, info]) => {
+                const type = inferBOMType(info.mpn);
+                return `<tr style="border-bottom:1px solid #e2e8f0;">
+                    <td style="padding:0.4rem 0.5rem;font-weight:600;">${info.mpn}</td>
+                    <td style="padding:0.4rem 0.5rem;color:#64748b;">${type}</td>
+                    <td style="padding:0.4rem 0.5rem;text-align:center;"><button onclick="bomList.delete('${id}');renderBOMTable()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:1rem;">✕</button></td>
+                </tr>`;
+            }).join('');
+        }
+
+        function inferBOMType(mpn) {
+            const m = mpn.toUpperCase();
+            if (m.includes('STM32') || m.includes('NX56') || m.includes('LPC') || m.includes('CORTEX')) return '🔲 MCU';
+            if (m.includes('LDO') || m.includes('LD39') || m.includes('AMS') || m.includes('LP50')) return '🔋 LDO';
+            if (m.includes('PMIC') || m.includes('PF') || m.includes('MAX77')) return '⚡ PMIC';
+            if (m.includes('SN651') || m.includes('L9616') || m.includes('TJA') || m.includes('MCP251')) return '🔌 CAN';
+            return '🧩 Component';
+        }
+
+        function showToast(msg) {
+            const t = document.createElement('div');
+            t.style = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:white;padding:0.6rem 1.2rem;border-radius:8px;font-size:0.9rem;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 2800);
+        }
+
+        async function checkBOMCompatibility() {
+            if (bomList.size < 2) {
+                showToast('⚠️ Add at least 2 parts to check compatibility.');
+                return;
+            }
+            document.getElementById('bom-check-btn').disabled = true;
+            document.getElementById('bom-report').innerHTML = `
+                <div style="padding:1rem;background:#f8fafc;border-radius:8px;color:#64748b;">
+                    ⏳ Running ${bomList.size}-part BOM compatibility check…
+                </div>`;
+
+            try {
+                const resp = await fetch('/api/bom/check', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ part_ids: [...bomList.keys()] })
+                });
+                const r = await resp.json();
+                renderBOMReport(r);
+            } catch(e) {
+                document.getElementById('bom-report').innerHTML = `<span style='color:red'>Check failed: ${e.message}</span>`;
+            } finally {
+                document.getElementById('bom-check-btn').disabled = false;
+            }
+        }
+
+        function renderBOMReport(r) {
+            const verdictColor = r.overall_verdict === 'pass' ? '#166534' : r.overall_verdict === 'warning' ? '#92400e' : '#991b1b';
+            const verdictBg = r.overall_verdict === 'pass' ? '#dcfce7' : r.overall_verdict === 'warning' ? '#fef9c3' : '#fee2e2';
+            const verdictIcon = r.overall_verdict === 'pass' ? '✅' : r.overall_verdict === 'warning' ? '⚠️' : '🚨';
+
+            function issueCard(i) {
+                const bg = i.severity === 'pass' ? '#f0fdf4' : i.severity === 'warning' ? '#fffbeb' : '#fef2f2';
+                const border = i.severity === 'pass' ? '#86efac' : i.severity === 'warning' ? '#fcd34d' : '#fca5a5';
+                const icon = i.severity === 'pass' ? '✅' : i.severity === 'warning' ? '⚠️' : '❌';
+                return `<div style="background:${bg};border-left:4px solid ${border};padding:0.75rem 1rem;border-radius:0 6px 6px 0;margin-bottom:0.5rem;">
+                    <div style="font-weight:600;margin-bottom:0.2rem;">${icon} ${i.check_name}</div>
+                    <div style="font-size:0.875rem;color:#374151;">${i.message}</div>
+                    ${i.recommendation ? `<div style="font-size:0.8rem;color:#6b7280;margin-top:0.25rem;font-style:italic;">💡 ${i.recommendation}</div>` : ''}
+                    ${i.parts_involved && i.parts_involved.length ? `<div style="margin-top:0.3rem;">${i.parts_involved.map(p => `<span style="background:#e2e8f0;color:#475569;padding:0.1rem 0.4rem;border-radius:4px;font-size:0.75rem;margin-right:0.25rem;">${p}</span>`).join('')}</div>` : ''}
+                </div>`;
+            }
+
+            const allChecks = [...(r.issues||[]), ...(r.warnings||[]), ...(r.passed||[])];
+
+            document.getElementById('bom-report').innerHTML = `
+                <div style="background:${verdictBg};color:${verdictColor};padding:0.875rem 1rem;border-radius:8px;font-weight:700;font-size:1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
+                    ${verdictIcon} BOM VERDICT: ${r.overall_verdict.toUpperCase()}
+                    <span style="margin-left:auto;font-weight:400;font-size:0.875rem;">❌ ${r.fail_count} fail &nbsp; ⚠️ ${r.warning_count} warn &nbsp; ✅ ${r.pass_count} pass</span>
+                </div>
+                <div>${allChecks.map(issueCard).join('')}</div>
+            `;
+        }
+
+        // Legacy: matrix button still works
+        const comparisonList = new Set();
+
+        function addToComparison(id) {
+            comparisonList.add(id);
+            alert(`Added to comparison matrix. Total items: ${comparisonList.size}. Click 'Generate Matrix' when ready.`);
+            document.getElementById('matrixBtn').style.display = 'block';
+        }
+
+        async function generateMatrix() {
+            if (comparisonList.size < 2) {
+                alert("Please add at least 2 parts to compare.");
+                return;
+            }
+            
+            setLoading(true);
+            try {
+                const res = await fetch('/api/compare', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        spec_id: currentSpecId,
+                        part_ids: Array.from(comparisonList)
+                    })
+                });
+                const data = await res.json();
+                showMatrixModal(data);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function showMatrixModal(matrix) {
+            const modal = document.createElement('div');
+            modal.style = "position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000;";
+            
+            const rowsHtml = matrix.rows.map(row => `
+                <tr>
+                    <td style="padding:0.75rem; border:1px solid #e2e8f0; font-weight:600;">${row.mpn}</td>
+                    ${matrix.headers.map(h => `<td style="padding:0.75rem; border:1px solid #e2e8f0;">${row.values[h] || '-'}</td>`).join('')}
+                </tr>
+            `).join('');
+
+            modal.innerHTML = `
+                <div style="background:white; padding:2rem; border-radius:8px; max-width:95vw; max-height:90vh; overflow:auto; position:relative;">
+                    <button onclick="this.parentElement.parentElement.remove()" style="position:absolute; top:1rem; right:1rem;">✕</button>
+                    <h2>Rigorous Comparison Matrix</h2>
+                    <table style="width:100%; border-collapse:collapse; margin-top:1rem; font-size:0.9rem;">
+                        <thead>
+                            <tr style="background:#f8fafc;">
+                                <th style="padding:0.75rem; border:1px solid #e2e8f0; text-align:left;">MPN</th>
+                                ${matrix.headers.map(h => `<th style="padding:0.75rem; border:1px solid #e2e8f0; text-align:left;">${h}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                    <div style="margin-top:1.5rem; padding:1rem; background:#eff6ff; border-radius:6px; color:#1e40af;">
+                        <strong>Architect's Conclusion:</strong>
+                        <p style="margin-top:0.5rem; line-height:1.5;">${matrix.conclusion}</p>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        function selectPart(id, mpn) {
+            if (!id || id === 'undefined') return;
+            document.getElementById('pm-part-id').value = id;
+
+            // Highlight selection
+            const cards = document.querySelectorAll('.part-card');
+            cards.forEach(card => {
+                if (card.querySelector('.mpn').innerText === mpn) {
+                    card.style.borderColor = 'var(--primary)';
+                    card.style.background = '#f0f9ff';
+                } else {
+                    card.style.borderColor = '#e2e8f0';
+                    card.style.background = 'white';
+                }
+            });
         }
 
         function setLoading(isLoading) {
@@ -386,7 +793,7 @@
             });
 
             const res = document.getElementById('pm-results');
-            res.textContent = "Solving...";
+            res.innerHTML = '<em>Solving constraints…</em>';
 
             try {
                 const response = await fetch(`/api/parts/${partId}/solve`, {
@@ -396,9 +803,27 @@
                 });
 
                 const data = await response.json();
-                res.textContent = JSON.stringify(data, null, 2);
+                if (data.error) {
+                    res.innerHTML = `<span style='color:red'>❌ Error: ${data.error}</span>`;
+                    return;
+                }
+                const status = data.success
+                    ? `<span style='color:green;font-weight:700'>✅ All constraints satisfied!</span>`
+                    : `<span style='color:orange;font-weight:700'>⚠️ Partial solution — some requirements unassigned</span>`;
+                const assignments = Object.entries(data.assignments || {}).map(([fn, asgn]) =>
+                    `<tr><td style='padding:0.25rem 0.5rem'>${fn}</td><td style='padding:0.25rem 0.5rem;font-weight:600'>${asgn.pin_name}</td><td style='padding:0.25rem 0.5rem'>AF${asgn.alternate_function}</td></tr>`
+                ).join('');
+                const unassigned = (data.unassigned || []).map(u => `<li style='color:red'>${u}</li>`).join('');
+                res.innerHTML = `
+                    ${status}
+                    <table style='width:100%;border-collapse:collapse;margin-top:0.75rem;font-size:0.9rem'>
+                        <thead><tr style='background:#f1f5f9'><th style='padding:0.25rem 0.5rem;text-align:left'>Function</th><th style='padding:0.25rem 0.5rem;text-align:left'>Pin</th><th style='padding:0.25rem 0.5rem;text-align:left'>AF</th></tr></thead>
+                        <tbody>${assignments || '<tr><td colspan=3 style="color:#94a3b8">No pin data available for this part yet.</td></tr>'}</tbody>
+                    </table>
+                    ${unassigned ? `<ul style='margin-top:0.5rem'>${unassigned}</ul>` : ''}
+                `;
             } catch (e) {
-                res.textContent = "Error: " + e;
+                res.innerHTML = `<span style='color:red'>Error: ${e}</span>`;
             }
         }
 
@@ -429,6 +854,46 @@
                 res.textContent = JSON.stringify(data, null, 2);
             } catch (e) {
                 res.textContent = "Error: " + e;
+            }
+        }
+
+        async function peerReview() {
+            if (!currentSpecId) { alert('Analyze requirements first.'); return; }
+            const overlay = document.createElement('div');
+            overlay.id = 'review-overlay';
+            overlay.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:2000;';
+            overlay.innerHTML = `<div style="background:white;padding:2rem;border-radius:12px;min-width:400px;max-width:700px;max-height:85vh;overflow-y:auto;position:relative;">
+                <button onclick="document.getElementById('review-overlay').remove()" style="position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.2rem;cursor:pointer;">✕</button>
+                <h2 style="margin-top:0;color:#5b21b6;">🔍 Architect's Peer Review</h2>
+                <p style="color:#64748b;font-size:0.9rem;">AI Senior Hardware Engineer is reviewing your design…</p>
+                <div id="review-content"><div style="text-align:center;padding:2rem;">⏳ Generating review…</div></div>
+            </div>`;
+            document.body.appendChild(overlay);
+
+            try {
+                const resp = await fetch('/api/peer-review', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({spec_id: currentSpecId})
+                });
+                const r = await resp.json();
+                const verdictColor = r.verdict === 'green' ? '#166534' : r.verdict === 'amber' ? '#92400e' : '#991b1b';
+                const verdictBg = r.verdict === 'green' ? '#dcfce7' : r.verdict === 'amber' ? '#fef9c3' : '#fee2e2';
+                const verdictIcon = r.verdict === 'green' ? '✅' : r.verdict === 'amber' ? '⚠️' : '🚨';
+                const notes = (r.architect_notes || []).map(n => `<li>${n}</li>`).join('');
+                const overkill = (r.overkill_warnings || []).map(n => `<li style='color:#d97706'>${n}</li>`).join('');
+                const missing = (r.missing_considerations || []).map(n => `<li style='color:#7c3aed'>${n}</li>`).join('');
+                document.getElementById('review-content').innerHTML = `
+                    <div style="background:${verdictBg};color:${verdictColor};padding:1rem;border-radius:8px;font-size:1.1rem;font-weight:700;margin-bottom:1rem;">
+                        ${verdictIcon} Verdict: ${(r.verdict||'').toUpperCase()} — ${r.verdict_reason || ''}
+                    </div>
+                    ${notes ? `<h4 style='margin-bottom:0.25rem;'>📋 Architect Notes</h4><ul style='margin-top:0.25rem;line-height:1.7'>${notes}</ul>` : ''}
+                    ${overkill ? `<h4 style='color:#d97706;margin-bottom:0.25rem;'>⚡ Overkill Warnings</h4><ul style='margin-top:0.25rem;line-height:1.7'>${overkill}</ul>` : ''}
+                    ${missing ? `<h4 style='color:#7c3aed;margin-bottom:0.25rem;'>🔎 Missing Considerations</h4><ul style='margin-top:0.25rem;line-height:1.7'>${missing}</ul>` : ''}
+                    ${r.recommended_action ? `<div style='margin-top:1rem;padding:0.75rem;background:#f1f5f9;border-radius:6px;font-style:italic;'>💡 ${r.recommended_action}</div>` : ''}
+                `;
+            } catch(e) {
+                document.getElementById('review-content').innerHTML = `<span style='color:red'>Review failed: ${e.message}</span>`;
             }
         }
     </script>

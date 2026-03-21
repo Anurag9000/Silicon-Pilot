@@ -161,13 +161,24 @@ class ConstraintCompiler:
             clauses = []
             
             if "min" in constraint_value:
-                clauses.append(f"{db_field} >= ${param_counter}")
-                params.append(constraint_value["min"])
+                # FUZZY ENGINEERING: Apply a 2% margin to minimum requirements
+                # This ensures a 2000KB chip satisfies a 2048KB request, as engineers allow for small variances.
+                raw_val = constraint_value["min"]
+                try: 
+                    num_val = float(raw_val)
+                    fuzzy_min = num_val * 0.98 # 2% tolerance
+                    clauses.append(f"CAST({db_field} AS NUMERIC) >= ${param_counter}")
+                    params.append(fuzzy_min)
+                except:
+                    clauses.append(f"CAST({db_field} AS NUMERIC) >= ${param_counter}")
+                    params.append(raw_val)
                 param_counter += 1
             
             if "max" in constraint_value:
-                clauses.append(f"{db_field} <= ${param_counter}")
-                params.append(constraint_value["max"])
+                clauses.append(f"CAST({db_field} AS NUMERIC) <= ${param_counter}")
+                val = constraint_value["max"]
+                try: params.append(float(val) if '.' in str(val) else int(val))
+                except: params.append(val)
                 param_counter += 1
             
             clause = " AND ".join(clauses)

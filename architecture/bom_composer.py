@@ -25,6 +25,7 @@ class ComponentCategory(str, Enum):
     PASSIVE = "passive"
     CONNECTOR = "connector"
     PROTECTION = "protection"
+    EVAL_BOARD = "evaluation_board"
     OTHER = "other"
 
 
@@ -167,10 +168,43 @@ class BOMComposer:
             for sensor in sensor_recommendations:
                 bom.add_item(self._create_sensor_item(sensor))
         
+        # Suggest Evaluation Board for the MCU
+        if mcu_recommendation:
+            board_item = self._suggest_eval_board(mcu_recommendation)
+            if board_item:
+                bom.add_item(board_item)
+        
         # Check compatibility
         self._check_compatibility(bom)
         
         return bom
+
+    def _suggest_eval_board(self, mcu: Any) -> Optional[BOMItem]:
+        """Suggest a specific Nucleo/Discovery board for the MCU"""
+        mpn = mcu.mpn if hasattr(mcu, 'mpn') else str(mcu)
+        manufacturer = mcu.manufacturer if hasattr(mcu, 'manufacturer') else "STMicroelectronics"
+        
+        if "STM32H7" in mpn:
+            board_mpn = "NUCLEO-H743ZI2"
+            desc = "High-performance STM32H7 development board with Ethernet and USB"
+        elif "STM32F4" in mpn:
+            board_mpn = "NUCLEO-F429ZI"
+            desc = "Standard STM32F4 development board with on-board debugger"
+        elif "STM32L4" in mpn:
+            board_mpn = "NUCLEO-L476RG"
+            desc = "Ultra-low-power STM32L4 development board"
+        else:
+            return None
+
+        return BOMItem(
+            subsystem="compute",
+            category=ComponentCategory.EVAL_BOARD,
+            recommended_mpn=board_mpn,
+            manufacturer=manufacturer,
+            description=desc,
+            quantity=1,
+            notes="Recommended for rapid prototyping of the selected MCU"
+        )
     
     def _create_mcu_item(self, mcu: Any) -> BOMItem:
         """Create BOM item from MCU recommendation"""

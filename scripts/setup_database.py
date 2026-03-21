@@ -74,15 +74,29 @@ def setup_database():
         # A. Create Extensions explicitly first
         print("Ensuring Extensions exist...")
         try:
+            cursor.execute('DROP SCHEMA public CASCADE; CREATE SCHEMA public;')
+            cursor.execute('GRANT ALL ON SCHEMA public TO postgres;')
+            cursor.execute('GRANT ALL ON SCHEMA public TO public;')
             cursor.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
             cursor.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
-            print("✓ Extensions created/verified")
+            print("✓ Schema reset and extensions created")
         except Exception as e:
-            print(f"⚠ Extension warning: {e}")
+            print(f"⚠ Schema/Extension warning: {e}")
 
         # B. Apply SQL Files
         root = Path(__file__).parent.parent / "database"
-        files = ["schema.sql", "component_tables.sql", "errata_schema.sql", "ldo_schema.sql"]
+        files = [
+            "schema.sql", 
+            "component_tables.sql", 
+            "errata_schema.sql", 
+            "ldo_schema.sql",
+            "dcdc_schema.sql",
+            "pmic_schema.sql",
+            "sensor_schema.sql",
+            "passive_schema.sql",
+            "pin_mux_schema.sql",
+            "power_budget_schema.sql"
+        ]
         
         for fname in files:
             fpath = root / fname

@@ -41,3 +41,11 @@ env/
 *~
 .DS_Store
 Thumbs.db
+
+# HardwareGenius Data
+server_final.log
+server_output.log
+*.log
+__pycache__/
+.pytest_cache/
+

@@ -130,7 +130,14 @@ class MockDatabase:
                 part_id TEXT,
                 pin_number TEXT,
                 pin_name TEXT,
-                af0_function TEXT,
+                af0_function TEXT, af1_function TEXT, af2_function TEXT, af3_function TEXT,
+                af4_function TEXT, af5_function TEXT, af6_function TEXT, af7_function TEXT,
+                af8_function TEXT, af9_function TEXT, af10_function TEXT, af11_function TEXT,
+                af12_function TEXT, af13_function TEXT, af14_function TEXT, af15_function TEXT,
+                has_adc INTEGER DEFAULT 0,
+                has_dac INTEGER DEFAULT 0,
+                is_power_pin INTEGER DEFAULT 0,
+                is_boot_pin INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -191,6 +198,19 @@ class MockDatabase:
         cursor.execute("CREATE TABLE IF NOT EXISTS dcdc_specs (id TEXT PRIMARY KEY, part_id TEXT, vin_min_v REAL, vin_max_v REAL, vout_fixed_v REAL, iout_max_ma REAL)")
         cursor.execute("CREATE TABLE IF NOT EXISTS pmic_specs (id TEXT PRIMARY KEY, part_id TEXT, buck_count INTEGER, ldo_count INTEGER)")
         cursor.execute("CREATE TABLE IF NOT EXISTS can_specs (id TEXT PRIMARY KEY, part_id TEXT, data_rate_mbps REAL)")
+        
+        # Pin mux constraints table (required by PinMuxSolver.get_constraints())
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pin_mux_constraints (
+                id TEXT PRIMARY KEY,
+                part_id TEXT NOT NULL,
+                constraint_type TEXT NOT NULL,
+                pin_names TEXT NOT NULL,
+                description TEXT,
+                voltage_v REAL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         cursor.execute("CREATE TABLE IF NOT EXISTS sensor_specs (id TEXT PRIMARY KEY, part_id TEXT, sensor_type TEXT, interface TEXT)")
         cursor.execute("CREATE TABLE IF NOT EXISTS passive_specs (id TEXT PRIMARY KEY, part_id TEXT, type TEXT, value_primary REAL, package_case TEXT)")
         
@@ -301,6 +321,9 @@ class MockDatabase:
         """Close connection"""
         if self.conn:
             self.conn.close()
+            self.conn = None
+        global _mock_db
+        _mock_db = None
 
 
 # Global mock database instance

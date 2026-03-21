@@ -160,29 +160,29 @@ class RankingEngine:
         
         # Flash headroom
         if 'flash_kb' in spec.hard_constraints:
-            required = spec.hard_constraints['flash_kb'].get('min', 0)
-            actual = candidate.get('flash_kb', 0)
+            required = float(spec.hard_constraints['flash_kb'].get('min', 0))
+            actual = float(candidate.get('flash_kb') or 0)
             if required > 0:
                 headroom = (actual - required) / required
                 headroom_components.append(min(headroom, 1.0))
-        
+
         # RAM headroom
         if 'ram_kb' in spec.hard_constraints or 'sram_kb' in spec.hard_constraints:
-            required = spec.hard_constraints.get('ram_kb', spec.hard_constraints.get('sram_kb', {})).get('min', 0)
-            actual = candidate.get('sram_kb', 0)
+            required = float(spec.hard_constraints.get('ram_kb', spec.hard_constraints.get('sram_kb', {})).get('min', 0))
+            actual = float(candidate.get('sram_kb') or candidate.get('ram_kb') or 0)
             if required > 0:
                 headroom = (actual - required) / required
                 headroom_components.append(min(headroom, 1.0))
-        
+
         # Peripheral headroom
         if spec.interfaces:
             for peripheral, min_count in spec.interfaces.items():
                 field_name = f"{peripheral}_count"
-                actual = candidate.get(field_name, 0)
+                actual = float(candidate.get(field_name) or 0)
+                min_count = float(min_count)
                 if min_count > 0:
                     headroom = (actual - min_count) / min_count
-                    headroom_components.append(min(headroom, 1.0))
-        
+                    headroom_components.append(min(headroom, 1.0))        
         # Average headroom
         if headroom_components:
             return sum(headroom_components) / len(headroom_components)
@@ -196,7 +196,7 @@ class RankingEngine:
         Returns:
             Score between 0.0 and 1.0
         """
-        family = candidate.get('family', '')
+        family = candidate.get('family') or ''
         
         # Try exact match
         if family in self.ecosystem_scores:
@@ -217,7 +217,7 @@ class RankingEngine:
         Returns:
             Score between 0.0 and 1.0
         """
-        status = candidate.get('status', 'unknown')
+        status = candidate.get('status') or 'unknown'
         
         lifecycle_map = {
             'active': 1.0,
@@ -231,22 +231,22 @@ class RankingEngine:
     def _calculate_cost_score(
         self,
         candidate: Dict[str, Any],
-        spec: RequirementSpec,
+        spec: RequirementSpec
     ) -> float:
         """
         Calculate cost score (lower is better).
-        
+
         Returns:
             Score between 0.0 and 1.0
         """
-        cost = candidate.get('cost_usd', 0)
-        
+        cost = float(candidate.get('cost_usd') or 0)
+
         if cost <= 0:
             return 0.5  # Neutral if no cost data
         
         # If there's a cost constraint, use it as reference
         if 'cost_usd' in spec.hard_constraints:
-            max_cost = spec.hard_constraints['cost_usd'].get('max', 10.0)
+            max_cost = float(spec.hard_constraints['cost_usd'].get('max', 10.0))
         else:
             max_cost = 10.0  # Default reference
         
@@ -257,16 +257,16 @@ class RankingEngine:
     def _calculate_power_score(
         self,
         candidate: Dict[str, Any],
-        spec: RequirementSpec,
+        spec: RequirementSpec
     ) -> float:
         """
         Calculate power score (lower is better).
-        
+
         Returns:
             Score between 0.0 and 1.0
         """
-        standby_ua = candidate.get('standby_ua', 0)
-        
+        standby_ua = float(candidate.get('standby_ua') or 0)
+
         if standby_ua <= 0:
             return 0.5  # Neutral if no power data
         
@@ -278,18 +278,18 @@ class RankingEngine:
     def _calculate_performance_score(
         self,
         candidate: Dict[str, Any],
-        spec: RequirementSpec,
+        spec: RequirementSpec
     ) -> float:
         """
-        Calculate performance score (higher clock, FPU, etc.).
-        
+        Calculate performance score based on clocks and accelerators.
+
         Returns:
             Score between 0.0 and 1.0
         """
         components = []
-        
+
         # Clock speed
-        max_mhz = candidate.get('max_mhz', 0)
+        max_mhz = float(candidate.get('max_mhz') or 0)
         if max_mhz > 0:
             # Normalize: 500 MHz is excellent
             clock_score = min(max_mhz / 500.0, 1.0)

@@ -100,10 +100,14 @@ def main():
     if not DATASHEET_DIR.exists():
         DATASHEET_DIR.mkdir(parents=True)
         
-    logger.info(f"Starting exhaustive collection of {len(EXHAUSTIVE_DATASHEET_LIST)} datasheets...")
+    total = len(EXHAUSTIVE_DATASHEET_LIST)
+    logger.info(f"Starting exhaustive collection of {total} datasheets...")
     
     success_count = 0
-    for ds in EXHAUSTIVE_DATASHEET_LIST:
+    for i, ds in enumerate(EXHAUSTIVE_DATASHEET_LIST, 1):
+        # MACHINE READABLE PROGRESS FOR UI
+        print(f"PROGRESS:{i}/{total}")
+        
         if download_datasheet(ds):
             success_count += 1
             

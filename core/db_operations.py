@@ -219,7 +219,7 @@ class DatabaseOperations:
         async with self.db_pool.acquire() as conn:
             await conn.execute(
                 query,
-                spec_id,
+                str(spec_id),
                 spec.model_dump_json(),
                 source_text,
                 spec.mode if isinstance(spec.mode, str) else 'constraint',

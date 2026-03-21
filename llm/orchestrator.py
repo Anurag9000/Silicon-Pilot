@@ -19,15 +19,16 @@ logger = logging.getLogger(__name__)
 class LLMOrchestrator:
     """LLM orchestration with OpenAI"""
     
-    def __init__(self, api_key: str, model: str = "gpt-4o"):
+    def __init__(self, api_key: str, base_url: Optional[str] = None, model: str = "gpt-4o"):
         """
         Initialize LLM orchestrator.
-        
-        Args:
-            api_key: OpenAI API key
-            model: Model to use (default: gpt-4o)
         """
-        self.client = AsyncOpenAI(api_key=api_key)
+        import httpx
+        self.client = AsyncOpenAI(
+            api_key=api_key, 
+            base_url=base_url,
+            timeout=httpx.Timeout(300.0, connect=10.0)
+        )
         self.model = model
     
     async def parse_requirements(
@@ -45,54 +46,35 @@ class LLMOrchestrator:
         """
         logger.info("Parsing requirements with LLM")
         
-        system_prompt = """You are a hardware requirements parser for an electronic component selection system.
+        system_prompt = """You are a world-class Senior Systems Architect and Hardware Engineer.
+Your task is to extract structured engineering constraints from user natural language.
 
-Your task is to extract structured constraints from natural language.
+ENGINEERING PHILOSOPHY:
+1. INFER REQUIREMENTS: If a user mentions a complex task (e.g., "Computer Vision", "Real-time ML", "Motor FOC control"), you must naturally infer the minimum viable hardware specs. 
+   - Vision/ML needs: High Flash (min 2048), High RAM (min 1024), and DSP/FPU capable cores (Cortex-M7).
+2. UNIT PRECISION: You MUST output raw integers for values. Do not write "KB" or "MHz".
 
-CRITICAL RULES:
-1. Identify the "component_type" (mcu, pmic, ldo, dcdc, sensor, passive, can, etc.)
-2. Only extract constraints that are explicitly stated
-3. Mark uncertain fields in "unknowns"
-4. If you make assumptions, list them in "assumptions"
+CRITICAL RULES FOR JSON KEYS:
+You MUST use these EXACT keys for hard_constraints:
+- "flash_kb": {"min": integer}
+- "sram_kb": {"min": integer}
+- "core": string
+- "can_count": {"min": integer}
 
-Output a JSON object with:
-- component_type: The category of component (default: "mcu")
-- hard_constraints: Must-have requirements (exact values or ranges)
-- soft_preferences: Nice-to-have features with weights
-- environment: Temperature, certifications, etc.
-- interfaces: Required peripherals (CAN, UART, SPI, I2C, USB, etc.)
-- unknowns: List of missing critical information
-- assumptions: List of assumptions made
-
-Example input: "Need Cortex-M4, at least 512KB flash, 2 CAN, QFP package"
-Example output:
+Output a JSON object EXACTLY like this example:
 {
   "component_type": "mcu",
   "hard_constraints": {
-    "core": "ARM Cortex-M4",
-    "flash_kb": {"min": 512},
-    "can_count": {"min": 2},
-    "package_family": ["QFP"]
+    "flash_kb": {"min": 2048},
+    "sram_kb": {"min": 1024},
+    "core": "ARM Cortex-M7",
+    "can_count": {"min": 2}
   },
-  "interfaces": {
-    "can": 2
-  },
-  "unknowns": ["temp_range", "ram_kb", "clock_mhz"],
-  "assumptions": []
-}
-
-Example input: "I need a 3.3V LDO with 500mA output and low noise"
-Example output:
-{
-  "component_type": "ldo",
-  "hard_constraints": {
-    "ldo_vout": 3.3,
-    "ldo_iout": {"min": 500},
-    "noise": "low"
-  },
+  "soft_preferences": {},
+  "environment": {},
   "interfaces": {},
-  "unknowns": ["vin_max", "package"],
-  "assumptions": []
+  "unknowns": [],
+  "assumptions": ["Vision requires M7 and high memory"]
 }
 """
         
@@ -105,7 +87,7 @@ Example output:
                 {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
-            temperature=0.0,  # Deterministic
+            temperature=0.0,
         )
         
         # Parse response
@@ -118,13 +100,20 @@ Example output:
             hard_constraints['component_type'] = parsed['component_type']
         
         # Build RequirementSpec
+        # Ensure assumptions is a dict (LLMs sometimes return a list)
+        assumptions_raw = parsed.get('assumptions', [])
+        if isinstance(assumptions_raw, list):
+            assumptions = {f"assumption_{i}": val for i, val in enumerate(assumptions_raw)}
+        else:
+            assumptions = assumptions_raw
+
         spec = RequirementSpec(
             hard_constraints=hard_constraints,
             soft_preferences=parsed.get('soft_preferences', {}),
             environment=parsed.get('environment', {}),
             interfaces=parsed.get('interfaces', {}),
             unknowns=parsed.get('unknowns', []),
-            assumptions=parsed.get('assumptions', []),
+            assumptions=assumptions,
         )
         
         logger.info(f"Parsed spec with {len(spec.unknowns)} unknowns")
@@ -138,31 +127,19 @@ Example output:
     ) -> List[Question]:
         """
         Generate clarifying questions based on unknowns.
-        
-        Args:
-            spec: Current requirement specification
-            candidates_count: Number of candidates matching current spec
-        
-        Returns:
-            List of questions to ask
         """
         logger.info("Generating questions with LLM")
         
-        system_prompt = """You are a hardware requirements clarification assistant.
-
+        system_prompt = """
+You are a hardware requirements clarification assistant.
 Your task is to generate clarifying questions to help narrow down MCU selection.
 
 CRITICAL RULES:
 1. Ask about unknowns that most affect the selection
 2. Prioritize questions by information gain
 3. Batch related questions together
-4. Explain WHY you're asking each question
+4. Explain why you're asking each question
 5. Provide reasonable options when applicable
-
-Question tiers:
-- TIER_1: Critical for basic filtering (temp range, core, memory)
-- TIER_2: Important for ranking (power, cost, ecosystem)
-- TIER_3: Nice-to-have (future-proofing, second-source)
 
 Output JSON array of questions with:
 - field_name: The field being asked about
@@ -172,12 +149,7 @@ Output JSON array of questions with:
 - options: Optional list of common answers
 """
         
-        user_prompt = f"""Current spec:
-Unknowns: {spec.unknowns}
-Assumptions: {spec.assumptions}
-Candidates matching current spec: {candidates_count}
-
-Generate 3-5 high-value questions to narrow down the selection."""
+        user_prompt = f"Constraints so far: {spec.model_dump_json()}\nCandidates matching: {candidates_count}"
         
         response = await self.client.chat.completions.create(
             model=self.model,
@@ -186,29 +158,15 @@ Generate 3-5 high-value questions to narrow down the selection."""
                 {"role": "user", "content": user_prompt},
             ],
             response_format={"type": "json_object"},
-            temperature=0.3,  # Slight creativity for question phrasing
         )
         
-        # Parse response
-        content = response.choices[0].message.content
-        parsed = json.loads(content)
-        
-        # Build Question objects
+        data = json.loads(response.choices[0].message.content)
         questions = []
-        for q_data in parsed.get('questions', []):
-            question = Question(
-                field_name=q_data['field_name'],
-                question_text=q_data['question_text'],
-                why_asking=q_data.get('why_asking', ''),
-                tier=QuestionTier(q_data.get('tier', 'tier_2')),
-                options=q_data.get('options'),
-            )
-            questions.append(question)
-        
-        logger.info(f"Generated {len(questions)} questions")
-        
+        for q in data.get('questions', []):
+            questions.append(Question(**q))
+            
         return questions
-    
+
     async def generate_explanation(
         self,
         spec: RequirementSpec,
@@ -216,90 +174,36 @@ Generate 3-5 high-value questions to narrow down the selection."""
         top_candidate: Dict[str, Any],
     ) -> str:
         """
-        Generate human-readable explanation of recommendation.
-        
-        Args:
-            spec: Requirement specification
-            candidates: All candidates
-            top_candidate: Top recommended part
-        
-        Returns:
-            Explanation text
+        Generate a human-readable explanation for why the top candidate was chosen.
         """
         logger.info("Generating explanation with LLM")
         
-        system_prompt = """You are a hardware recommendation explainer.
-
-Your task is to explain WHY a particular MCU was recommended.
-
-CRITICAL RULES:
-1. Reference specific constraints from the requirement
-2. Explain how the top choice satisfies each constraint
-3. Mention key differentiators vs other candidates
-4. Be concise but informative
-5. Use technical language appropriate for engineers
-
-Format:
-- Start with a one-sentence summary
-- List key matches (constraints satisfied)
-- Explain ranking factors (headroom, ecosystem, etc.)
-- Note any trade-offs or considerations
+        system_prompt = """
+You are a hardware engineer explaining component selection.
+Explain why the top choice is the best fit for the user's requirements.
+Compare it briefly to the other candidates if relevant.
+Highlight how it satisfies critical constraints.
 """
         
-        user_prompt = f"""Requirement:
-{json.dumps(spec.model_dump(), indent=2)}
+        user_prompt = f"""
+Requirement:
+{spec.model_dump_json()}
 
-Top recommendation: {top_candidate['mpn']} ({top_candidate['manufacturer']})
-Total candidates: {len(candidates)}
+Top Choice:
+{json.dumps(top_candidate, default=str)}
 
-Explain why this is the best choice."""
-        
+Other Candidates:
+{json.dumps(candidates[:3], default=str)}
+"""
+
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.5,
-        )
-        
-        explanation = response.choices[0].message.content
-        
-        return explanation
-    
-    async def format_near_miss_suggestion(
-        self,
-        failed_constraint: str,
-        current_value: Any,
-        required_value: Any,
-    ) -> str:
-        """
-        Generate human-friendly near-miss suggestion.
-        
-        Args:
-            failed_constraint: Constraint that failed
-            current_value: Actual value
-            required_value: Required value
-        
-        Returns:
-            Suggestion text
-        """
-        prompt = f"""A candidate MCU failed this constraint:
-- Constraint: {failed_constraint}
-- Required: {required_value}
-- Actual: {current_value}
-
-Generate a concise suggestion for how to relax this constraint.
-Example: "Consider relaxing flash requirement to ≥256KB to include STM32F405"
-"""
-        
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "user", "content": prompt},
-            ],
             temperature=0.3,
-            max_tokens=100,
+            max_tokens=200,
         )
         
         return response.choices[0].message.content.strip()

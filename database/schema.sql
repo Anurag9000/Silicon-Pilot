@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS parts (
     mpn VARCHAR(100) NOT NULL UNIQUE,
     manufacturer VARCHAR(100) NOT NULL,
     family VARCHAR(100),
+    description TEXT,
     status VARCHAR(50) NOT NULL DEFAULT 'active',
     package_family VARCHAR(50),
     package_name VARCHAR(100),
@@ -73,33 +74,51 @@ CREATE TABLE IF NOT EXISTS pinned_parts (
 CREATE TABLE IF NOT EXISTS mcu_specs (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
-    
+
     -- Core specifications
     core VARCHAR(100),
     max_mhz INTEGER,
     flash_kb INTEGER,
     sram_kb INTEGER,
+    ram_kb INTEGER,
     eeprom_kb INTEGER,
-    
+
     -- Peripherals (counts)
     can_count INTEGER DEFAULT 0,
-    usb_count INTEGER DEFAULT 0, -- mapped from usb_fs/hs
+    can_fd_count INTEGER DEFAULT 0,
+    usb_fs INTEGER DEFAULT 0,
+    usb_hs INTEGER DEFAULT 0,
+    usb_count INTEGER DEFAULT 0,
     uart_count INTEGER DEFAULT 0,
     i2c_count INTEGER DEFAULT 0,
     spi_count INTEGER DEFAULT 0,
-    adc_count INTEGER DEFAULT 0, -- mapped from adc_channels
+    adc_channels INTEGER DEFAULT 0,
+    adc_count INTEGER DEFAULT 0,
+    dac_channels INTEGER DEFAULT 0,
     dac_count INTEGER DEFAULT 0,
+    ethernet INTEGER DEFAULT 0,
     ethernet_count INTEGER DEFAULT 0,
-    
+    timers_count INTEGER DEFAULT 0,
+    timer_count INTEGER DEFAULT 0,
+    pwm_channels INTEGER DEFAULT 0,
+
+    -- Features
+    has_fpu INTEGER DEFAULT 0,
+    has_dsp INTEGER DEFAULT 0,
+    has_crypto INTEGER DEFAULT 0,
+    has_wireless INTEGER DEFAULT 0,
+
     -- Voltages
+    vdd_min_v DECIMAL(4,2),
+    vdd_max_v DECIMAL(4,2),
     voltage_min_v DECIMAL(4,2),
     voltage_max_v DECIMAL(4,2),
-    
+
     -- Power consumption (optional, often incomplete)
     active_ma DECIMAL(8,2),
     standby_ua DECIMAL(8,2),
     sleep_ua DECIMAL(8,2),
-    
+
     -- Cost (optional, volatile)
     cost_usd DECIMAL(8,2),
     
@@ -193,8 +212,8 @@ CREATE INDEX IF NOT EXISTS idx_conflicts_status ON conflicts(status);
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS requirement_specs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    raw_query TEXT,
-    parsed_spec JSONB,
+    source_text TEXT,
+    spec JSONB,
     mode VARCHAR(50) DEFAULT 'discovery', -- discovery, comparison, verification
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

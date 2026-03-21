@@ -6,114 +6,19 @@
 -- ============================================================================
 
 -- PMICs (Power Management ICs)
-CREATE TABLE IF NOT EXISTS pmic_specs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
-    
-    -- Input
-    input_voltage_min_v DECIMAL(6,2),
-    input_voltage_max_v DECIMAL(6,2),
-    
-    -- Outputs
-    output_count INTEGER DEFAULT 1,
-    output_voltage_min_v DECIMAL(6,2),
-    output_voltage_max_v DECIMAL(6,2),
-    output_current_max_ma INTEGER,
-    
-    -- Efficiency
-    efficiency_percent DECIMAL(5,2),
-    quiescent_current_ua DECIMAL(8,2),
-    
-    -- Features
-    has_power_sequencing BOOLEAN DEFAULT FALSE,
-    has_dvfs BOOLEAN DEFAULT FALSE,
-    has_battery_charger BOOLEAN DEFAULT FALSE,
-    
-    -- Protection
-    has_ovp BOOLEAN DEFAULT FALSE,  -- Over-voltage protection
-    has_uvp BOOLEAN DEFAULT FALSE,  -- Under-voltage protection
-    has_ocp BOOLEAN DEFAULT FALSE,  -- Over-current protection
-    has_thermal_shutdown BOOLEAN DEFAULT FALSE,
-    
-    extras JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
-CREATE INDEX IF NOT EXISTS idx_pmic_specs_voltage ON pmic_specs(input_voltage_min_v, input_voltage_max_v);
-CREATE INDEX IF NOT EXISTS idx_pmic_specs_current ON pmic_specs(output_current_max_ma);
+
+
 
 -- DC-DC Converters (Buck, Boost, Buck-Boost)
-CREATE TABLE IF NOT EXISTS dcdc_specs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
-    
-    -- Type
-    topology VARCHAR(50),  -- buck, boost, buck-boost, SEPIC, flyback
-    
-    -- Input
-    input_voltage_min_v DECIMAL(6,2),
-    input_voltage_max_v DECIMAL(6,2),
-    
-    -- Output
-    output_voltage_min_v DECIMAL(6,2),
-    output_voltage_max_v DECIMAL(6,2),
-    output_current_max_ma INTEGER,
-    
-    -- Performance
-    switching_frequency_khz INTEGER,
-    efficiency_percent DECIMAL(5,2),
-    quiescent_current_ua DECIMAL(8,2),
-    
-    -- Features
-    has_sync_rectification BOOLEAN DEFAULT FALSE,
-    has_pgood BOOLEAN DEFAULT FALSE,  -- Power good signal
-    has_enable BOOLEAN DEFAULT FALSE,
-    
-    -- External components
-    requires_external_inductor BOOLEAN DEFAULT TRUE,
-    requires_external_compensation BOOLEAN DEFAULT FALSE,
-    
-    extras JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
-CREATE INDEX IF NOT EXISTS idx_dcdc_specs_voltage ON dcdc_specs(input_voltage_min_v, output_voltage_max_v);
-CREATE INDEX IF NOT EXISTS idx_dcdc_specs_current ON dcdc_specs(output_current_max_ma);
+
+
 
 -- LDOs (Low-Dropout Regulators)
-CREATE TABLE IF NOT EXISTS ldo_specs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
-    
-    -- Input
-    input_voltage_min_v DECIMAL(6,2),
-    input_voltage_max_v DECIMAL(6,2),
-    
-    -- Output
-    output_voltage_v DECIMAL(6,2),
-    output_voltage_adjustable BOOLEAN DEFAULT FALSE,
-    output_current_max_ma INTEGER,
-    
-    -- Performance
-    dropout_voltage_mv INTEGER,
-    psrr_db DECIMAL(5,2),  -- Power Supply Rejection Ratio
-    output_noise_uv_rms DECIMAL(8,2),
-    quiescent_current_ua DECIMAL(8,2),
-    
-    -- Features
-    has_enable BOOLEAN DEFAULT FALSE,
-    has_pgood BOOLEAN DEFAULT FALSE,
-    has_soft_start BOOLEAN DEFAULT FALSE,
-    
-    extras JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
-CREATE INDEX IF NOT EXISTS idx_ldo_specs_voltage ON ldo_specs(output_voltage_v);
-CREATE INDEX IF NOT EXISTS idx_ldo_specs_current ON ldo_specs(output_current_max_ma);
+
+
 
 
 -- ============================================================================
