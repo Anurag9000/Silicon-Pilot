@@ -2,6 +2,8 @@
 
 **Engineering-Grade MCU Selection Engine with Explainable AI**
 
+![System Architecture Diagram](architecture_diagram.png)
+
 Silicon-Pilot ingests real STM32 datasheet PDFs and provides deep parametric analysis, architectural validation, exhaustive parameter traceability, and cross-component compatibility checks.
 
 ---
