@@ -1,7 +1,7 @@
 
-# HardwareGenius Feature Manifest
+# Silicon-Pilot Feature Manifest
 
-This document exhaustively lists every feature, capability, and supported component in the HardwareGenius system.
+This document exhaustively lists every feature, capability, and supported component in the Silicon-Pilot system.
 
 ## 1. Component Support
 The system currently supports ingestion, search, and validation for the following component categories:

@@ -1,5 +1,5 @@
 """
-Additional Subsystem Solvers for HardwareGenius
+Additional Subsystem Solvers for Silicon-Pilot
 
 Extends multi-subsystem solving to cover:
 - Memory (Flash, EEPROM, SRAM, FRAM)

@@ -1,5 +1,5 @@
 """
-Multi-Subsystem Solvers for HardwareGenius Phase 2
+Multi-Subsystem Solvers for Silicon-Pilot Phase 2
 
 Extends the deterministic solver to support multiple component categories:
 - Power management (LDOs, buck converters, battery management)

@@ -53,7 +53,7 @@ async def get_pool() -> asyncpg.Pool:
 
 
 # Create router
-router = APIRouter(prefix="/api/v1", tags=["HardwareGenius API"])
+router = APIRouter(prefix="/api/v1", tags=["Silicon-Pilot API"])
 
 # ==================== Request/Response Models ====================
 

@@ -13,7 +13,7 @@ from architecture.reference_design_matcher import ReferenceDesignMatcher
 async def test_matcher():
     print("Testing Reference Design Matcher...")
     
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     matcher = ReferenceDesignMatcher(db_url)
     conn = await asyncpg.connect(db_url)
     

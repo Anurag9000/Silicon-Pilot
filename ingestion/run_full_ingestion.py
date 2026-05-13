@@ -81,7 +81,7 @@ if __name__ == "__main__":
     # Ensure DATABASE_URL is set
     DB_URL = os.getenv("DATABASE_URL")
     if not DB_URL:
-        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
         os.environ["DATABASE_URL"] = DB_URL
         
     # Allow limit override

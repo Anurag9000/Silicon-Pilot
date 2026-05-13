@@ -1,4 +1,4 @@
-# Silicon-Pilot (HardwareGenius)
+# Silicon-Pilot (Silicon-Pilot)
 
 **Engineering-Grade MCU Selection Engine with Explainable AI**
 
@@ -42,7 +42,7 @@ python scripts/populate_datasheet_params.py
 
 **To run with real Postgres:**
 ```bash
-export DATABASE_URL='postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius'
+export DATABASE_URL='postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot'
 python scripts/run_pipeline.py
 python server.py
 ```
@@ -56,3 +56,11 @@ python server.py
 | [ARCHITECTURE.md](ARCHITECTURE.md) | System design, component breakdown, data flow |
 | [workflow.md](workflow.md) | Detailed ingestion and runtime workflow |
 | [database/schema.sql](database/schema.sql) | Full PostgreSQL schema with all tables |
+
+## Advanced Engineering Features
+
+### Advanced Engineering Features
+- **Drop-In Replacement Engine**: Input an EOL part, and the system ranks pin-to-pin and software-compatible alternatives based on the level of schematic rework needed (Drop-In, Minor, Moderate, Major).
+- **Advanced Power Profiler**: Define custom duty cycles (Run, Sleep, Stop) and active peripherals. The tool computes real-world average current draw and estimated battery life using Peukert-corrected chemistry derating from datasheet seed data.
+- **PCB Manufacturing Cost Analyzer**: Evaluates the mechanical complexity of MCU packages (LQFP, BGA, WLCSP, etc.), predicts required PCB layers, identifies HDI (High Density Interconnect) requirements, and provides a raw cost multiplier.
+- **Component Ecosystem RAG**: Recommends complete, matched chipsets (CAN transceivers, motor drivers, LDOs, IMUs) that share logic-level compatibility and interface constraints with the selected MCU.

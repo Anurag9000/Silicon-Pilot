@@ -1,5 +1,5 @@
 """
-Web UI Prototype for HardwareGenius
+Web UI Prototype for Silicon-Pilot
 
 Simple FastAPI + HTML/JavaScript frontend for:
 - Template selection
@@ -30,7 +30,7 @@ from core.models import RequirementSpec
 # FastAPI App
 # ============================================================================
 
-app = FastAPI(title="HardwareGenius", version="1.0.0")
+app = FastAPI(title="Silicon-Pilot", version="1.0.0")
 
 # Setup templates directory
 templates_dir = Path(__file__).parent / "templates"
@@ -151,7 +151,7 @@ async def search_parts(request: SearchRequest):
     Faceted search for MCUs.
     """
     
-    DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     conn = await asyncpg.connect(DB_URL)
     
     try:
@@ -323,7 +323,7 @@ INDEX_HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HardwareGenius - AI Hardware Design Assistant</title>
+    <title>Silicon-Pilot - AI Hardware Design Assistant</title>
     <style>
         * {
             margin: 0;
@@ -502,7 +502,7 @@ INDEX_HTML = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 HardwareGenius</h1>
+            <h1>🚀 Silicon-Pilot</h1>
             <p>AI-Powered Hardware Design Assistant</p>
         </div>
         

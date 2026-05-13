@@ -1,5 +1,5 @@
 """
-Configuration Notes Generator for HardwareGenius Phase 2
+Configuration Notes Generator for Silicon-Pilot Phase 2
 
 Generates implementation guidance for recommended hardware:
 - Clock tree configuration

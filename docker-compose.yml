@@ -4,7 +4,7 @@ services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_DB: hardwaregenius
+      POSTGRES_DB: siliconpilot
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-1Anurag2Basistha}
     volumes:
@@ -25,14 +25,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - hardwaregenius
+      - siliconpilot
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-1Anurag2Basistha}@db:5432/hardwaregenius
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-1Anurag2Basistha}@db:5432/siliconpilot
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     ports:
@@ -45,7 +45,7 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
     networks:
-      - hardwaregenius
+      - siliconpilot
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -54,7 +54,7 @@ services:
       start_period: 40s
 
 networks:
-  hardwaregenius:
+  siliconpilot:
     driver: bridge
 
 volumes:

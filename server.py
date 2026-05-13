@@ -491,7 +491,7 @@ async def trigger_ingestion(mode: str = "production", background_tasks: Backgrou
             exe = sys.executable
             env = os.environ.copy()
             env["PYTHONPATH"] = "."
-            env["DATABASE_URL"] = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+            env["DATABASE_URL"] = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
             env["REAL_DATABASE_URL"] = env["DATABASE_URL"]
 
             ingestion_progress = {"status": "running", "percent": 5, "message": "Step 1/3: Downloading missing datasheets..."}

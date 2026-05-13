@@ -299,7 +299,7 @@ async def main():
     DB_URL = os.getenv("DATABASE_URL")
     if not DB_URL:
         # Fallback for manual run
-        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
         
     print("="*60)
     print(" "*15 + "STM32 MCU INGESTION")

@@ -1,7 +1,7 @@
 
-# HardwareGenius: The Complete Architecture Guide
+# Silicon-Pilot: The Complete Architecture Guide
 
-This document explains the end-to-end flow of the HardwareGenius system, detailing how it transforms unstructured PDF datasheets into a structured, queryable database effectively used by solvers.
+This document explains the end-to-end flow of the Silicon-Pilot system, detailing how it transforms unstructured PDF datasheets into a structured, queryable database effectively used by solvers.
 
 ---
 

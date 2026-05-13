@@ -240,7 +240,7 @@ class LDOIngester:
 
 async def main():
     import os
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     ingester = LDOIngester(db_url)
     await ingester.ingest_all()
 

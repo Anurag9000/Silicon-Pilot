@@ -73,7 +73,7 @@ class DocumentFetcher:
         
         # User agent for requests
         self.session.headers.update({
-            'User-Agent': 'HardwareGenius/1.0 (Educational Project; +https://github.com/Anurag9000/HardwareGenius)'
+            'User-Agent': 'Silicon-Pilot/1.0 (Educational Project; +https://github.com/Anurag9000/Silicon-Pilot)'
         })
     
     def _ensure_bucket_exists(self):

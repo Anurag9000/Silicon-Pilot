@@ -1,5 +1,5 @@
 """
-Intent Classifier for HardwareGenius Phase 2
+Intent Classifier for Silicon-Pilot Phase 2
 
 Uses LLM to parse user natural language and extract:
 - Device type

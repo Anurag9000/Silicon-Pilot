@@ -12,7 +12,7 @@ import ingest_all_stm32_part2
 
 # Get the list of parts
 ALL_PARTS = ingest_all_stm32.PARTS + ingest_all_stm32_part2.get_more_parts(ingest_all_stm32.p)
-DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
 
 async def run_ingestion():
     print(f"Connecting to DB to insert {len(ALL_PARTS)} exhaustive STM32 parts...")

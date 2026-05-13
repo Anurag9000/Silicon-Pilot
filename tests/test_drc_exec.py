@@ -11,7 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from solver.design_rule_checker import DesignRuleChecker, Severity
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
 
 async def test_drc_execution():
     print(f"Connecting to {DB_URL}...")

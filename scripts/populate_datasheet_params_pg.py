@@ -8,7 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
 
 async def run_exhaustive_parameter_ingestion():
     logger.info("Connecting to PostgreSQL to populate datasheet_parameters for ALL parts...")

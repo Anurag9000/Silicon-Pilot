@@ -1,4 +1,4 @@
-HardwareGenius System Workflow
+Silicon-Pilot System Workflow
 This document details exactly how the system works, linking files, functions, and data flows.
 
 1. Initialization & Ingestion Workflow

@@ -12,7 +12,7 @@ async def setup_database():
     
     # Force the working URL if env var is weird, but try env first
     # Using the one that WORKED in debug_connection.py
-    default_url = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+    default_url = "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
     db_url = os.getenv("DATABASE_URL", default_url)
 
     print(f"Connecting to {db_url}...")

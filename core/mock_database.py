@@ -17,7 +17,7 @@ import uuid
 class MockDatabase:
     """SQLite-based mock database for testing"""
     
-    def __init__(self, db_path: str = "data/hardwaregenius_mock.db"):
+    def __init__(self, db_path: str = "data/siliconpilot_mock.db"):
         self.db_path = db_path
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = None

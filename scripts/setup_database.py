@@ -16,12 +16,12 @@ from pathlib import Path
 # Database connection string
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+    "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
 )
 
 def setup_database():
     print("\n" + "="*60)
-    print("HARDWAREGENIUS DATABASE SETUP (ROBUST)")
+    print("SILICON-PILOT DATABASE SETUP (ROBUST)")
     print("="*60 + "\n")
     
     # Parse connection string

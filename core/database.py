@@ -38,7 +38,7 @@ class Database:
             raise RuntimeError(
                 "DATABASE_URL environment variable is not set. "
                 "Set it to your PostgreSQL connection string, e.g. "
-                "postgresql://user:password@localhost:5432/hardwaregenius"
+                "postgresql://user:password@localhost:5432/siliconpilot"
             )
 
         logger.info(f"Connecting to PostgreSQL: {self.database_url.split('@')[-1]}")

@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from ingestion.stm32_datasheet_extractor import STM32DatasheetExtractor
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
 
 async def run_ingestion(part_mpn: str = None, pdf_path: str = None):
     conn = await asyncpg.connect(DB_URL)

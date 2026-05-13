@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 DATASHEETS_DIR = DATA_DIR / "stm32_datasheets"
 SNIPPETS_DIR = DATA_DIR / "snippets"
-DB_NAME = "hardwaregenius"
+DB_NAME = "siliconpilot"
 
 # Postgres commands
 PG_ENV = os.environ.copy()

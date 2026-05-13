@@ -1,8 +1,8 @@
-# HardwareGenius System Architecture
+# Silicon-Pilot System Architecture
 
 ## Overview
 
-HardwareGenius is a **deterministic AI-powered hardware selection system** that combines structured parametric databases with LLM reasoning to provide engineer-grade MCU and component recommendations.
+Silicon-Pilot is a **deterministic AI-powered hardware selection system** that combines structured parametric databases with LLM reasoning to provide engineer-grade MCU and component recommendations.
 
 ---
 

@@ -18,8 +18,8 @@ read -s -p "PostgreSQL password: " PG_PASS
 echo ""
 read -p "PostgreSQL host [localhost]: " PG_HOST
 PG_HOST=${PG_HOST:-localhost}
-read -p "Database name [hardwaregenius]: " PG_DB
-PG_DB=${PG_DB:-hardwaregenius}
+read -p "Database name [siliconpilot]: " PG_DB
+PG_DB=${PG_DB:-siliconpilot}
 
 DB_URL="postgresql://${PG_USER}:${PG_PASS}@${PG_HOST}:5432/${PG_DB}"
 

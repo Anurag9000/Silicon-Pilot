@@ -3,7 +3,7 @@ import asyncpg
 import os
 
 async def main():
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     conn = await asyncpg.connect(db_url)
     try:
         # Step 1: Enforce extensions

@@ -1,5 +1,5 @@
 """
-Standalone Web UI for HardwareGenius (No Database Required)
+Standalone Web UI for Silicon-Pilot (No Database Required)
 
 Simple demo version that works without database connection.
 """
@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from pathlib import Path
 import json
 
-app = FastAPI(title="HardwareGenius Demo", version="1.0.0")
+app = FastAPI(title="Silicon-Pilot Demo", version="1.0.0")
 
 # Sample data (would come from database in production)
 SAMPLE_TEMPLATES = [
@@ -156,7 +156,7 @@ async def export_design(request: Request):
     filepath = output_dir / filename
     
     # Write simple export
-    content = "# HardwareGenius Export\n\n"
+    content = "# Silicon-Pilot Export\n\n"
     content += "## Bill of Materials\n\n"
     for item in SAMPLE_BOM:
         content += f"- {item['mpn']}: {item['description']} (${item['price_usd']})\n"
@@ -183,7 +183,7 @@ def get_inline_html():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>HardwareGenius Demo</title>
+    <title>Silicon-Pilot Demo</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -241,7 +241,7 @@ def get_inline_html():
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 HardwareGenius</h1>
+            <h1>🚀 Silicon-Pilot</h1>
             <p>AI-Powered Hardware Design Assistant (Demo)</p>
         </div>
         
@@ -376,7 +376,7 @@ def get_inline_html():
 if __name__ == "__main__":
     import uvicorn
     print("=" * 80)
-    print("HardwareGenius Demo Server Starting...")
+    print("Silicon-Pilot Demo Server Starting...")
     print("=" * 80)
     print()
     print("Access the UI at: http://localhost:8000")

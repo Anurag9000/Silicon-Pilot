@@ -5,7 +5,7 @@ Schema columns filled: all parts + mcu_specs columns + extras JSONB
 """
 import asyncio, os, sys, uuid
 sys.path.insert(0, "/home/anurag-basistha/Projects/ToFix/Silicon-Pilot")
-os.environ.setdefault("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+os.environ.setdefault("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
 
 import asyncpg
 

@@ -30,7 +30,7 @@ async def run_complete_demo():
     """Run complete end-to-end demonstration"""
     
     print("=" * 80)
-    print("HardwareGenius - Complete End-to-End Demonstration")
+    print("Silicon-Pilot - Complete End-to-End Demonstration")
     print("=" * 80)
     print()
     

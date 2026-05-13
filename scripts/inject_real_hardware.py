@@ -6,12 +6,12 @@ from psycopg2.extras import RealDictCursor
 
 def force_inject_real_hardware():
     # 1. Inject into SQLite (Mock)
-    sqlite_conn = sqlite3.connect("data/hardwaregenius_mock.db")
+    sqlite_conn = sqlite3.connect("data/siliconpilot_mock.db")
     inject_to_db(sqlite_conn, "sqlite")
     sqlite_conn.close()
     
     # 2. Inject into PostgreSQL (Real)
-    pg_url = os.getenv("REAL_DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    pg_url = os.getenv("REAL_DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     try:
         pg_conn = psycopg2.connect(pg_url)
         inject_to_db(pg_conn, "postgres")

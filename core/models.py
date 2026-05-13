@@ -1,5 +1,5 @@
 """
-Core Data Models for HardwareGenius
+Core Data Models for Silicon-Pilot
 
 Pydantic models for API contracts, validation, and internal data structures.
 These models enforce the "evidence-required" principle and deterministic behavior.

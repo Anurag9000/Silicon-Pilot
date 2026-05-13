@@ -5,7 +5,7 @@ Covers all major STM32 product lines with real datasheet-sourced specs.
 import asyncio, asyncpg, os, uuid, sys
 from datetime import datetime
 
-DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
 
 # (family, mpn, core, flash_kb, sram_kb, max_mhz, uart, spi, i2c, can, usb_fs, usb_hs, adc_ch, dac_ch, timers, has_fpu, has_dsp, pkg, vdd_min, vdd_max, temp_min, temp_max, price_usd)
 STM32_PARTS = [

@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # DB URL — never hardcode credentials; read from environment only
 if not os.getenv("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+    os.environ["DATABASE_URL"] = "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
 
 import asyncpg
 from templates.template_system import TemplateLoader
@@ -32,7 +32,7 @@ try:
 except ImportError:
     from questions.dynamic_engine import DynamicQuestionEngine
 
-app = FastAPI(title="HardwareGenius Production", version="1.0.0")
+app = FastAPI(title="Silicon-Pilot Production", version="1.0.0")
 
 DB_URL = os.environ["DATABASE_URL"]
 
@@ -345,7 +345,7 @@ def get_inline_html():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>HardwareGenius Production</title>
+    <title>Silicon-Pilot Production</title>
     <style>
         /* Same styles as demo_app.py */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -406,7 +406,7 @@ def get_inline_html():
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 HardwareGenius</h1>
+            <h1>🚀 Silicon-Pilot</h1>
             <p>AI-Powered Hardware Design Assistant (Production)</p>
         </div>
         
@@ -528,7 +528,7 @@ def get_inline_html():
 if __name__ == "__main__":
     import uvicorn
     print("=" * 80)
-    print("HardwareGenius Production Server Starting...")
+    print("Silicon-Pilot Production Server Starting...")
     print("=" * 80)
     print()
     print("Features:")

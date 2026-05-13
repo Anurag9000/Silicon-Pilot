@@ -2,7 +2,7 @@ import sqlite3
 import uuid
 
 def seed_test_pins():
-    conn = sqlite3.connect("data/hardwaregenius_mock.db")
+    conn = sqlite3.connect("data/siliconpilot_mock.db")
     cursor = conn.cursor()
     
     # 1. Get some existing parts to attach pins to

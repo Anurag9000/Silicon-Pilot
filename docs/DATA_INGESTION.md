@@ -1,4 +1,4 @@
-# HardwareGenius - Data Ingestion Guide
+# Silicon-Pilot - Data Ingestion Guide
 
 ## Overview
 
@@ -35,10 +35,10 @@ docker-compose ps
 
 ```powershell
 # Apply schema
-docker-compose exec postgres psql -U hg_user -d hardwaregenius -f /docker-entrypoint-initdb.d/schema.sql
+docker-compose exec postgres psql -U hg_user -d siliconpilot -f /docker-entrypoint-initdb.d/schema.sql
 
 # Verify tables created
-docker-compose exec postgres psql -U hg_user -d hardwaregenius -c "\dt"
+docker-compose exec postgres psql -U hg_user -d siliconpilot -c "\dt"
 ```
 
 ---
@@ -88,10 +88,10 @@ python scripts/ingest_datasheets.py --manifest data/stm32_datasheets/manifest.js
 docker-compose logs -f worker
 
 # Check database for ingested parts
-docker-compose exec postgres psql -U hg_user -d hardwaregenius -c "SELECT COUNT(*) FROM parts;"
+docker-compose exec postgres psql -U hg_user -d siliconpilot -c "SELECT COUNT(*) FROM parts;"
 
 # Check evidence records
-docker-compose exec postgres psql -U hg_user -d hardwaregenius -c "SELECT COUNT(*) FROM evidence;"
+docker-compose exec postgres psql -U hg_user -d siliconpilot -c "SELECT COUNT(*) FROM evidence;"
 ```
 
 ---
@@ -133,7 +133,7 @@ docker-compose exec redis redis-cli ping
 docker-compose logs postgres
 
 # Verify connection
-docker-compose exec postgres psql -U hg_user -d hardwaregenius -c "SELECT 1;"
+docker-compose exec postgres psql -U hg_user -d siliconpilot -c "SELECT 1;"
 ```
 
 ### MinIO storage issues

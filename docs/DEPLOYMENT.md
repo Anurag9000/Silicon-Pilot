@@ -1,7 +1,7 @@
-# HardwareGenius Deployment Guide
+# Silicon-Pilot Deployment Guide
 
 ## Overview
-This guide covers deploying HardwareGenius in production using Docker.
+This guide covers deploying Silicon-Pilot in production using Docker.
 
 ---
 
@@ -23,7 +23,7 @@ Create `.env` file:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://postgres:your_password@db:5432/hardwaregenius
+DATABASE_URL=postgresql://postgres:your_password@db:5432/siliconpilot
 POSTGRES_PASSWORD=your_password
 
 # API
@@ -110,7 +110,7 @@ services:
   db:
     image: postgres:17
     environment:
-      POSTGRES_DB: hardwaregenius
+      POSTGRES_DB: siliconpilot
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -152,15 +152,15 @@ volumes:
 
 ```bash
 # Build and push image
-docker build -t hardwaregenius:latest .
-docker tag hardwaregenius:latest <your-ecr-repo>:latest
+docker build -t siliconpilot:latest .
+docker tag siliconpilot:latest <your-ecr-repo>:latest
 docker push <your-ecr-repo>:latest
 
 # Deploy using ECS task definition
 aws ecs create-service \\
-    --cluster hardwaregenius-cluster \\
-    --service-name hardwaregenius-api \\
-    --task-definition hardwaregenius:1 \\
+    --cluster siliconpilot-cluster \\
+    --service-name siliconpilot-api \\
+    --task-definition siliconpilot:1 \\
     --desired-count 2 \\
     --launch-type FARGATE
 ```
@@ -169,9 +169,9 @@ aws ecs create-service \\
 
 ```bash
 # Build and deploy
-gcloud builds submit --tag gcr.io/PROJECT_ID/hardwaregenius
-gcloud run deploy hardwaregenius \\
-    --image gcr.io/PROJECT_ID/hardwaregenius \\
+gcloud builds submit --tag gcr.io/PROJECT_ID/siliconpilot
+gcloud run deploy siliconpilot \\
+    --image gcr.io/PROJECT_ID/siliconpilot \\
     --platform managed \\
     --region us-central1 \\
     --allow-unauthenticated
@@ -184,27 +184,27 @@ gcloud run deploy hardwaregenius \\
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hardwaregenius-api
+  name: siliconpilot-api
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: hardwaregenius-api
+      app: siliconpilot-api
   template:
     metadata:
       labels:
-        app: hardwaregenius-api
+        app: siliconpilot-api
     spec:
       containers:
       - name: api
-        image: hardwaregenius:latest
+        image: siliconpilot:latest
         ports:
         - containerPort: 8000
         env:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: hardwaregenius-secrets
+              name: siliconpilot-secrets
               key: database-url
         resources:
           requests:
@@ -229,10 +229,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: hardwaregenius-api
+  name: siliconpilot-api
 spec:
   selector:
-    app: hardwaregenius-api
+    app: siliconpilot-api
   ports:
   - port: 80
     targetPort: 8000
@@ -250,7 +250,7 @@ spec:
 docker-compose logs -f api
 
 # Kubernetes
-kubectl logs -f deployment/hardwaregenius-api
+kubectl logs -f deployment/siliconpilot-api
 ```
 
 ### 2. Metrics (Prometheus)
@@ -297,7 +297,7 @@ curl http://localhost:8000/health
 docker-compose up -d --scale api=3
 
 # Kubernetes
-kubectl scale deployment hardwaregenius-api --replicas=5
+kubectl scale deployment siliconpilot-api --replicas=5
 ```
 
 ### Database Scaling
@@ -314,17 +314,17 @@ kubectl scale deployment hardwaregenius-api --replicas=5
 
 ```bash
 # Backup
-docker-compose exec db pg_dump -U postgres hardwaregenius > backup.sql
+docker-compose exec db pg_dump -U postgres siliconpilot > backup.sql
 
 # Restore
-docker-compose exec -T db psql -U postgres hardwaregenius < backup.sql
+docker-compose exec -T db psql -U postgres siliconpilot < backup.sql
 ```
 
 ### Automated Backups
 
 ```bash
 # Cron job (daily at 2 AM)
-0 2 * * * docker-compose exec db pg_dump -U postgres hardwaregenius | gzip > /backups/hardwaregenius_$(date +\%Y\%m\%d).sql.gz
+0 2 * * * docker-compose exec db pg_dump -U postgres siliconpilot | gzip > /backups/siliconpilot_$(date +\%Y\%m\%d).sql.gz
 ```
 
 ---
@@ -354,10 +354,10 @@ Use reverse proxy (Nginx, Traefik):
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name api.hardwaregenius.com;
+    server_name api.siliconpilot.com;
 
-    ssl_certificate /etc/ssl/certs/hardwaregenius.crt;
-    ssl_certificate_key /etc/ssl/private/hardwaregenius.key;
+    ssl_certificate /etc/ssl/certs/siliconpilot.crt;
+    ssl_certificate_key /etc/ssl/private/siliconpilot.key;
 
     location / {
         proxy_pass http://localhost:8000;
@@ -482,20 +482,20 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Build Docker image
-        run: docker build -t hardwaregenius:${{ github.sha }} .
+        run: docker build -t siliconpilot:${{ github.sha }} .
       
       - name: Run tests
-        run: docker run hardwaregenius:${{ github.sha }} python -m pytest
+        run: docker run siliconpilot:${{ github.sha }} python -m pytest
       
       - name: Push to registry
         run: |
           echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
-          docker push hardwaregenius:${{ github.sha }}
+          docker push siliconpilot:${{ github.sha }}
       
       - name: Deploy to production
         run: |
           # Deploy to your cloud provider
-          kubectl set image deployment/hardwaregenius-api api=hardwaregenius:${{ github.sha }}
+          kubectl set image deployment/siliconpilot-api api=siliconpilot:${{ github.sha }}
 ```
 
 ---
@@ -532,6 +532,6 @@ curl http://localhost:8000/health
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/your-org/hardwaregenius/issues
-- Documentation: https://docs.hardwaregenius.com
-- Email: support@hardwaregenius.com
+- GitHub Issues: https://github.com/your-org/siliconpilot/issues
+- Documentation: https://docs.siliconpilot.com
+- Email: support@siliconpilot.com

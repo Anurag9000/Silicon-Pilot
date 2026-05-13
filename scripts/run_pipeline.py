@@ -2,7 +2,7 @@
 """
 Master Ingestion Pipeline
 
-Executes the entire HardwareGenius data ingestion flow in the correct order.
+Executes the entire Silicon-Pilot data ingestion flow in the correct order.
 One command to rule them all.
 """
 
@@ -40,7 +40,7 @@ def run_script(script_path, desc):
         return False
 
 def main():
-    logger.info("Starting HardwareGenius Ingestion Pipeline...")
+    logger.info("Starting Silicon-Pilot Ingestion Pipeline...")
     
     # 1. Database Setup (Idempotent)
     if not run_script("scripts/setup_database.py", "Database Schema Setup"):

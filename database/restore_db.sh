@@ -1,11 +1,11 @@
 #!/bin/bash
-# restore_db.sh — Restore the Silicon-Pilot hardwaregenius PostgreSQL database
+# restore_db.sh — Restore the Silicon-Pilot siliconpilot PostgreSQL database
 # Usage: bash database/restore_db.sh [postgres_password]
 # Defaults to PGPASSWORD env var if set, otherwise prompts
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DB="hardwaregenius"
+DB="siliconpilot"
 USER="${PGUSER:-postgres}"
 HOST="${PGHOST:-localhost}"
 PORT="${PGPORT:-5432}"

@@ -3,7 +3,7 @@ import os
 import psycopg2
 from pathlib import Path
 
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
 
 def verify():
     print(f"Verifying schema.sql execution on {DB_URL}...")

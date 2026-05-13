@@ -8,8 +8,8 @@ This guide provides detailed instructions on how to set up and run the Silicon-P
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Anurag9000/HardwareGenius
-   cd HardwareGenius
+   git clone https://github.com/Anurag9000/Silicon-Pilot
+   cd Silicon-Pilot
    ```
 
 2. **Setup environment variables:**
@@ -37,7 +37,7 @@ The easiest way to run the full stack (API, Worker, DB, S3, Redis).
 3. **Database initialization:**
    The database is automatically initialized, but you can manually apply the schema if needed:
    ```bash
-   docker compose exec postgres psql -U hg_user -d hardwaregenius -f /docker-entrypoint-initdb.d/schema.sql
+   docker compose exec postgres psql -U hg_user -d siliconpilot -f /docker-entrypoint-initdb.d/schema.sql
    ```
 
 ---
@@ -71,7 +71,7 @@ If you want to run components individually for development.
 
 ## Data Ingestion Workflow
 
-HardwareGenius starts with an empty database. You must ingest datasheets to populate it.
+Silicon-Pilot starts with an empty database. You must ingest datasheets to populate it.
 
 1. **Collect Datasheets:**
    ```bash
@@ -95,7 +95,7 @@ HardwareGenius starts with an empty database. You must ingest datasheets to popu
   - Port: `5432`
   - User: `hg_user`
   - Pass: `hg_password`
-  - DB: `hardwaregenius`
+  - DB: `siliconpilot`
 
 ---
 

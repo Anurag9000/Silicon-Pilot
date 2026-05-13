@@ -1,4 +1,4 @@
-# HardwareGenius Pipeline - Visual Explanation
+# Silicon-Pilot Pipeline - Visual Explanation
 
 **Understanding the Core Components**
 

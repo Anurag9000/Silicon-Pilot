@@ -38,7 +38,7 @@ async def main():
         sys.exit(1)
         
     sql_file = sys.argv[1]
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     
     success = await apply_sql_file(sql_file, db_url)
     sys.exit(0 if success else 1)

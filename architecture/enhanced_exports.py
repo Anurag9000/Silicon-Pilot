@@ -1,5 +1,5 @@
 """
-Enhanced Export Features for HardwareGenius
+Enhanced Export Features for Silicon-Pilot
 
 Exports BOM and configuration to various CAD and firmware tools:
 - Eagle XML
@@ -193,7 +193,7 @@ class STM32CubeMXExporter:
                 for key, value in peripheral_config.items():
                     lines.append(f"{peripheral}.{key}={value}")
         
-        lines.append("ProjectManager.ProjectName=HardwareGenius_Generated")
+        lines.append("ProjectManager.ProjectName=Silicon-Pilot_Generated")
         lines.append("ProjectManager.TargetToolchain=STM32CubeIDE")
         
         return "\n".join(lines)

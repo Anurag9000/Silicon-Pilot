@@ -1,5 +1,5 @@
 """
-Design Ontology for HardwareGenius Phase 2
+Design Ontology for Silicon-Pilot Phase 2
 
 Defines the formal vocabulary for device types, subsystems, functions,
 interfaces, and environmental contexts used in template-based architecture synthesis.

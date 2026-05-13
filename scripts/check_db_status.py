@@ -3,7 +3,7 @@ import asyncio
 import asyncpg
 
 async def check_db():
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     print(f"Connecting to: {db_url}")
     try:
         conn = await asyncpg.connect(db_url)

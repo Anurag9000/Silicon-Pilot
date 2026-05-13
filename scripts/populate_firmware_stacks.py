@@ -411,7 +411,7 @@ async def populate_firmware_stacks(db_url: str):
 async def main():
     import os
     
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     await populate_firmware_stacks(db_url)
 
 

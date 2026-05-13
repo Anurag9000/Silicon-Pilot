@@ -1,4 +1,4 @@
--- Additional Component Category Tables for HardwareGenius
+-- Additional Component Category Tables for Silicon-Pilot
 -- Extends schema.sql with POWER, COMMUNICATION, SENSOR, MEMORY, PASSIVE, CONNECTOR, PROTECTION
 
 -- ============================================================================

@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 
 # Database credentials
-DB_NAME = "hardwaregenius"
+DB_NAME = "siliconpilot"
 DB_USER = "postgres"
 DB_PASSWORD = "1Anurag2Basistha"
 DB_HOST = "localhost"
@@ -70,14 +70,14 @@ def main():
     os.environ["DATABASE_URL"] = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     
     print("="*70)
-    print(" "*15 + "HARDWAREGENIUS DATABASE INITIALIZATION")
+    print(" "*15 + "SILICON-PILOT DATABASE INITIALIZATION")
     print("="*70 + "\n")
     
     # Step 1: Drop and recreate database
     print("[1/8] Dropping and recreating database...")
     
     # Kill existing connections
-    kill_cmd = "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'hardwaregenius' AND pid <> pg_backend_pid();"
+    kill_cmd = "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'siliconpilot' AND pid <> pg_backend_pid();"
     run_psql(kill_cmd, db="postgres")
     
     success, stdout, stderr = run_psql(f"DROP DATABASE IF EXISTS {DB_NAME};", db="postgres")

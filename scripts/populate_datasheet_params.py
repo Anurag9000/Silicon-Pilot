@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 MANIFEST_PATH = Path("data/stm32_datasheets/manifest.json")
-MOCK_DB_PATH  = Path("data/hardwaregenius_mock.db")
+MOCK_DB_PATH  = Path("data/siliconpilot_mock.db")
 
 
 # ──────────────────────────────────────────────────────────────────────────────

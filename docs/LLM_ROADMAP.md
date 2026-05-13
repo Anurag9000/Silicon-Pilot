@@ -1,6 +1,6 @@
 # Advanced LLM Intelligence - Implementation Plan
 
-**Goal**: Add 4 high-impact LLM features to make HardwareGenius significantly more intelligent
+**Goal**: Add 4 high-impact LLM features to make Silicon-Pilot significantly more intelligent
 
 ---
 

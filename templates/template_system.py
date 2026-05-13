@@ -1,5 +1,5 @@
 """
-Template System for HardwareGenius Phase 2
+Template System for Silicon-Pilot Phase 2
 
 Loads, validates, and manages device templates for architecture synthesis.
 Templates are YAML files containing curated engineering knowledge.

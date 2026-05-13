@@ -1,5 +1,5 @@
 """
-Stress Test Script for HardwareGenius
+Stress Test Script for Silicon-Pilot
 
 Loads golden scenarios and runs them against the Ranking Engine.
 Simulates high load if needed.

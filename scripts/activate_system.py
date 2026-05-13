@@ -46,9 +46,9 @@ def git_sync():
 def main():
     # Ensure DATABASE_URL is set for all child processes
     if not os.getenv("DATABASE_URL"):
-        os.environ["DATABASE_URL"] = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        os.environ["DATABASE_URL"] = "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
         
-    logger.info("HardwareGenius Master Activation Sequence Initiated")
+    logger.info("Silicon-Pilot Master Activation Sequence Initiated")
     
     # 1. Initialize Database
     if not run_command([PYTHON_EXE, "scripts/init_complete_database.py"], "Full Database Initialization"):
@@ -75,7 +75,7 @@ def main():
     time.sleep(5)
     git_sync()
     
-    logger.info("\n✅ HardwareGenius is ACTIVE and UP-TO-DATE!")
+    logger.info("\n✅ Silicon-Pilot is ACTIVE and UP-TO-DATE!")
     logger.info("Server is running in a new window. Access it at http://localhost:8000")
 
 if __name__ == "__main__":

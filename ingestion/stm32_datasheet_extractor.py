@@ -316,7 +316,7 @@ if __name__ == "__main__":
     import sys
     import asyncio
     
-    path = "d:/Done,Toreview/HardwareGenius/datasheets/mock_stm32.pdf"
+    path = "d:/Done,Toreview/Silicon-Pilot/datasheets/mock_stm32.pdf"
     if len(sys.argv) > 1: path = sys.argv[1]
     
     extractor = STM32DatasheetExtractor(path)

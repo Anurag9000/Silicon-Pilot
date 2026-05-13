@@ -81,7 +81,7 @@ async def main():
     DB_URL = os.getenv("DATABASE_URL")
     if not DB_URL:
         # Fallback for manual run
-        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+        DB_URL = "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
         
     try:
         conn = await asyncpg.connect(DB_URL)

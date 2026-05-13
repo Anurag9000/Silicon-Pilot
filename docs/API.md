@@ -1,7 +1,7 @@
-# HardwareGenius API Documentation
+# Silicon-Pilot API Documentation
 
 ## Overview
-HardwareGenius provides a comprehensive API for hardware component selection, design validation, and optimization.
+Silicon-Pilot provides a comprehensive API for hardware component selection, design validation, and optimization.
 
 ## Base URL
 ```

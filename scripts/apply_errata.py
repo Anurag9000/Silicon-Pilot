@@ -6,7 +6,7 @@ from pathlib import Path
 # Database connection string
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
+    "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot"
 )
 
 def apply_errata():

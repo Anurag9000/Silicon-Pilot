@@ -1,5 +1,5 @@
 """
-BOM Composer for HardwareGenius Phase 2
+BOM Composer for Silicon-Pilot Phase 2
 
 Composes complete Bill of Materials from multi-subsystem recommendations.
 Checks compatibility, generates alternatives, and provides sourcing information.

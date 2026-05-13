@@ -2,7 +2,7 @@ import sqlite3
 
 def verify_data():
     try:
-        conn = sqlite3.connect("data/hardwaregenius_mock.db")
+        conn = sqlite3.connect("data/siliconpilot_mock.db")
         cursor = conn.cursor()
         
         tables = ['parts', 'mcu_specs']

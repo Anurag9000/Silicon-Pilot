@@ -42,7 +42,7 @@ env/
 .DS_Store
 Thumbs.db
 
-# HardwareGenius Data
+# Silicon-Pilot Data
 server_final.log
 server_output.log
 *.log

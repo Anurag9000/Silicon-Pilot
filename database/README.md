@@ -10,18 +10,18 @@
 ### 1. Create the database
 
 ```bash
-createdb hardwaregenius
-# OR: psql -c "CREATE DATABASE hardwaregenius;"
+createdb siliconpilot
+# OR: psql -c "CREATE DATABASE siliconpilot;"
 ```
 
 ### 2. Load schema + data
 
 ```bash
 # Load schema first
-psql hardwaregenius < database/dumps/schema.sql
+psql siliconpilot < database/dumps/schema.sql
 
 # Load 461 real STM32 board data + 5071 datasheet parameters
-psql hardwaregenius < database/dumps/hardware_data.sql
+psql siliconpilot < database/dumps/hardware_data.sql
 ```
 
 ### 3. Configure environment
@@ -29,7 +29,7 @@ psql hardwaregenius < database/dumps/hardware_data.sql
 ```bash
 cp .env.example .env
 # Edit .env and set DATABASE_URL to your PostgreSQL connection string
-# e.g.: DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/hardwaregenius
+# e.g.: DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/siliconpilot
 ```
 
 ### 4. Start the server

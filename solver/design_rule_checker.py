@@ -507,7 +507,7 @@ async def main():
     import os
     import sys
     
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/siliconpilot")
     pool = await asyncpg.create_pool(db_url)
     checker = DesignRuleChecker(pool)
     print("DRC Engine Initialized.")
