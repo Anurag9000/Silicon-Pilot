@@ -570,6 +570,10 @@
                         <button onclick="event.stopPropagation(); addToBOM('${partId}', '${mpn}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; border-radius: 4px; cursor: pointer;">🧩 Add to BOM</button>
                         <button onclick="event.stopPropagation(); peerReview('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #ede9fe; color: #5b21b6; border: 1px solid #a78bfa; border-radius: 4px; cursor: pointer;">🔍 Architect Review</button>
                         <button onclick="event.stopPropagation(); exhaustiveReview('${partId}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #fdf2f8; color: #9d174d; border: 1px solid #fbcfe8; border-radius: 4px; cursor: pointer;">📑 Full Detail Verification</button>
+                        <button onclick="event.stopPropagation(); findDropIns('${partId}','${mpn}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #f0fdf4; color: #166534; border: 1px solid #6ee7b7; border-radius: 4px; cursor: pointer;">🔄 Drop-in Replacements</button>
+                        <button onclick="event.stopPropagation(); openPowerProfiler('${partId}','${mpn}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; border-radius: 4px; cursor: pointer;">🔋 Power Profile</button>
+                        <button onclick="event.stopPropagation(); analyzePackage('${partId}','${mpn}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #f8fafc; color: #334155; border: 1px solid #94a3b8; border-radius: 4px; cursor: pointer;">📦 Package Analysis</button>
+                        <button onclick="event.stopPropagation(); getEcosystem('${partId}','${mpn}')" style="font-size: 0.8rem; padding: 0.25rem 0.6rem; background: #faf5ff; color: #6b21a8; border: 1px solid #c084fc; border-radius: 4px; cursor: pointer;">🔌 Ecosystem</button>
                     </div>
                     ${evidenceHtml ? `<div class="evidence-viewer"><strong>Evidence:</strong>${evidenceHtml}</div>` : ''}
                 </div>
@@ -1067,34 +1071,230 @@
             }
         }
 
-        async function calcPower() {
-            const partId = document.getElementById('pm-part-id').value; // Reuse part ID input
-            if (!partId) return alert("Enter Part ID in Pin Mux section");
+        function showFeatureModal(titleHtml, bodyHtml) {
+            const m = document.createElement('div');
+            m.style = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:2000;';
+            m.innerHTML = `<div style="background:white;border-radius:14px;width:95vw;max-width:900px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 30px 60px rgba(0,0,0,0.3);overflow:hidden;">
+                <div style="padding:1rem 1.5rem;background:#0f172a;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+                    <div style="color:white;font-weight:700;font-size:1.05rem;">${titleHtml}</div>
+                    <button onclick="this.closest('[style*=fixed]').remove()" style="background:#ef4444;color:white;border:none;border-radius:6px;padding:0.35rem 0.8rem;cursor:pointer;font-weight:700;">✕</button>
+                </div>
+                <div style="overflow:auto;flex:1;padding:1.5rem;">${bodyHtml}</div>
+            </div>`;
+            document.body.appendChild(m);
+            return m;
+        }
 
-            const run = parseFloat(document.getElementById('pwr-run').value);
-            const sleep = parseFloat(document.getElementById('pwr-sleep').value);
-            const stop = parseFloat(document.getElementById('pwr-stop').value);
+        function loadingModal(title) {
+            return showFeatureModal(title, '<div style="text-align:center;padding:3rem;color:#64748b;">⏳ Loading…</div>');
+        }
 
-            const res = document.getElementById('pwr-results');
-            res.textContent = "Calculating...";
-
+        // ── Drop-in Replacement Engine ──────────────────────────────────────
+        async function findDropIns(partId, mpn) {
+            const m = loadingModal(`🔄 Drop-in Replacements for ${mpn}`);
+            const body = m.querySelector('[style*="overflow:auto"]');
             try {
-                const response = await fetch(`/api/parts/${partId}/power`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        run_percent: run,
-                        sleep_percent: sleep,
-                        stop_percent: stop,
-                        peripherals: []
-                    })
-                });
+                const r = await fetch(`/api/parts/${partId}/replacements`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({max_results:8})});
+                const d = await r.json();
+                if (!r.ok) { body.innerHTML=`<span style="color:red">❌ ${d.detail}</span>`; return; }
+                const src = d.source_part;
+                const levelColor = {'Drop-In':'#166534','Minor':'#0369a1','Moderate':'#92400e','Major':'#991b1b'};
+                const levelBg   = {'Drop-In':'#dcfce7','Minor':'#e0f2fe','Moderate':'#fef9c3','Major':'#fee2e2'};
+                const rows = (d.replacements||[]).map(rep => {
+                    const lc = levelColor[rep.rework_level]||'#475569';
+                    const lb = levelBg[rep.rework_level]||'#f1f5f9';
+                    const sc = rep.scores;
+                    const notes = (rep.rework_notes||[]).map(n=>`<li style="font-size:0.82rem;margin-bottom:2px;">${n}</li>`).join('');
+                    return `<tr style="border-bottom:1px solid #f1f5f9;">
+                        <td style="padding:0.6rem 0.75rem;font-weight:700;">${rep.mpn}</td>
+                        <td style="padding:0.6rem 0.75rem;font-size:0.82rem;">${rep.family||''}</td>
+                        <td style="padding:0.6rem 0.75rem;">${rep.package_family||'?'}<br><span style="font-size:0.78rem;color:#64748b;">${rep.pin_count||'?'} pins</span></td>
+                        <td style="padding:0.6rem 0.75rem;font-family:monospace;font-size:0.82rem;">${rep.flash_kb||'?'}KB / ${rep.sram_kb||'?'}KB</td>
+                        <td style="padding:0.6rem 0.75rem;"><span style="background:${lb};color:${lc};padding:0.2rem 0.55rem;border-radius:10px;font-weight:700;font-size:0.78rem;white-space:nowrap;">${rep.rework_level}</span></td>
+                        <td style="padding:0.6rem 0.75rem;font-weight:700;font-size:0.9rem;">${(sc.composite*100).toFixed(0)}%</td>
+                        <td style="padding:0.6rem 0.75rem;"><details><summary style="cursor:pointer;font-size:0.8rem;color:#2563eb;">Notes (${rep.rework_notes.length})</summary><ul style="margin:0.25rem 0 0 1rem;padding:0;">${notes}</ul></details></td>
+                    </tr>`;
+                }).join('');
+                const cnt = d.rework_level_counts||{};
+                body.innerHTML = `
+                    <div style="background:#f8fafc;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.875rem;">
+                        Source: <strong>${src.mpn}</strong> (${src.package_family}, ${src.flash_kb}KB Flash, ${src.core}) —
+                        searched ${d.total_candidates_searched} candidates:
+                        <span style="color:#166534;font-weight:700;">${cnt['Drop-In']||0} Drop-In</span> ·
+                        <span style="color:#0369a1;font-weight:700;">${cnt['Minor']||0} Minor</span> ·
+                        <span style="color:#92400e;font-weight:700;">${cnt['Moderate']||0} Moderate</span>
+                    </div>
+                    <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+                        <thead style="background:#f1f5f9;"><tr>
+                            <th style="padding:0.5rem 0.75rem;text-align:left;">MPN</th><th style="padding:0.5rem 0.75rem;text-align:left;">Family</th>
+                            <th style="padding:0.5rem 0.75rem;text-align:left;">Package</th><th style="padding:0.5rem 0.75rem;text-align:left;">Flash/RAM</th>
+                            <th style="padding:0.5rem 0.75rem;text-align:left;">Rework Level</th><th style="padding:0.5rem 0.75rem;text-align:left;">Score</th>
+                            <th style="padding:0.5rem 0.75rem;text-align:left;">Details</th>
+                        </tr></thead>
+                        <tbody>${rows||'<tr><td colspan="7" style="color:#94a3b8;padding:1rem;">No replacements found in flash class.</td></tr>'}</tbody>
+                    </table></div>`;
+            } catch(e) { body.innerHTML=`<span style="color:red">Error: ${e.message}</span>`; }
+        }
 
-                const data = await response.json();
-                res.textContent = JSON.stringify(data, null, 2);
-            } catch (e) {
-                res.textContent = "Error: " + e;
-            }
+        // ── Advanced Power Profiler ─────────────────────────────────────────
+        function openPowerProfiler(partId, mpn) {
+            const m = showFeatureModal(`🔋 Power Profiler — ${mpn}`, `
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+                <div>
+                    <h3 style="margin:0 0 0.75rem;font-size:1rem;">Operating Modes (must total 100%)</h3>
+                    <div id="pp-modes" style="margin-bottom:0.75rem;">
+                        <div style="display:grid;grid-template-columns:1fr 80px 100px;gap:0.4rem;align-items:center;margin-bottom:0.4rem;">
+                            <label style="font-size:0.85rem;color:#475569;">Run mode</label>
+                            <input id="pp-run-pct" type="number" value="10" min="0" max="100" style="padding:0.3rem;border:1px solid #cbd5e1;border-radius:4px;width:100%;">
+                            <input id="pp-run-mhz" type="number" value="80" placeholder="MHz" style="padding:0.3rem;border:1px solid #cbd5e1;border-radius:4px;width:100%;">
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 80px 100px;gap:0.4rem;align-items:center;margin-bottom:0.4rem;">
+                            <label style="font-size:0.85rem;color:#475569;">Sleep mode</label>
+                            <input id="pp-sleep-pct" type="number" value="10" min="0" max="100" style="padding:0.3rem;border:1px solid #cbd5e1;border-radius:4px;width:100%;">
+                            <span style="font-size:0.75rem;color:#94a3b8;">—</span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 80px 100px;gap:0.4rem;align-items:center;">
+                            <label style="font-size:0.85rem;color:#475569;">Stop mode</label>
+                            <input id="pp-stop-pct" type="number" value="80" min="0" max="100" style="padding:0.3rem;border:1px solid #cbd5e1;border-radius:4px;width:100%;">
+                            <span style="font-size:0.75rem;color:#94a3b8;">—</span>
+                        </div>
+                    </div>
+                    <h3 style="margin:0.75rem 0 0.5rem;font-size:1rem;">Peripherals Active</h3>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:0.75rem;">
+                        ${['uart','spi','i2c','can','usb','adc'].map(p=>`<label style="display:flex;align-items:center;gap:0.4rem;font-size:0.85rem;"><input type="checkbox" class="pp-peri" value="${p}"> ${p.toUpperCase()} <span style="color:#94a3b8;font-size:0.75rem;">(100% duty)</span></label>`).join('')}
+                    </div>
+                    <h3 style="margin:0 0 0.5rem;font-size:1rem;">Battery</h3>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-bottom:1rem;">
+                        <div><label style="font-size:0.82rem;color:#475569;">Capacity (mAh)</label><input id="pp-batt-mah" type="number" value="2000" style="width:100%;padding:0.35rem;border:1px solid #cbd5e1;border-radius:4px;margin-top:0.2rem;"></div>
+                        <div><label style="font-size:0.82rem;color:#475569;">Chemistry</label><select id="pp-batt-chem" style="width:100%;padding:0.35rem;border:1px solid #cbd5e1;border-radius:4px;margin-top:0.2rem;"><option>Li-Po</option><option>Li-Ion</option><option>Alkaline</option><option>NiMH</option><option>LiFePO4</option></select></div>
+                    </div>
+                    <button onclick="runPowerProfile('${partId}')" style="background:#ea580c;color:white;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-weight:700;cursor:pointer;width:100%;">⚡ Calculate Power Profile</button>
+                </div>
+                <div id="pp-results" style="background:#f8fafc;border-radius:10px;padding:1rem;font-size:0.875rem;color:#64748b;min-height:200px;">
+                    Configure modes and click Calculate.
+                </div></div>`);
+        }
+
+        async function runPowerProfile(partId) {
+            const modes = [
+                {name:'run',  percent:parseFloat(document.getElementById('pp-run-pct').value)||0, freq_mhz:parseFloat(document.getElementById('pp-run-mhz').value)||80},
+                {name:'sleep',percent:parseFloat(document.getElementById('pp-sleep-pct').value)||0},
+                {name:'stop', percent:parseFloat(document.getElementById('pp-stop-pct').value)||0},
+            ];
+            const peripherals = [...document.querySelectorAll('.pp-peri:checked')].map(el=>({type:el.value,duty_percent:100}));
+            const battery_mah = parseFloat(document.getElementById('pp-batt-mah').value)||null;
+            const battery_chemistry = document.getElementById('pp-batt-chem').value;
+            const res = document.getElementById('pp-results');
+            res.innerHTML = '⏳ Calculating…';
+            try {
+                const r = await fetch(`/api/parts/${partId}/power`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modes,peripherals,battery_mah,battery_chemistry})});
+                const d = await r.json();
+                if (!r.ok) { res.innerHTML=`<span style="color:red">❌ ${d.detail}</span>`; return; }
+                const batt = d.battery;
+                const lifeDays = batt.lifetime_days;
+                const lifeStr = lifeDays ? (lifeDays >= 365 ? `${(lifeDays/365).toFixed(1)} years` : lifeDays >= 1 ? `${lifeDays.toFixed(1)} days` : `${(lifeDays*24).toFixed(1)} hours`) : 'N/A';
+                const tips = (d.recommendations||[]).map(t=>`<li style="margin-bottom:4px;">${t}</li>`).join('');
+                const modeRows = (d.mode_breakdown||[]).map(m=>`<tr><td style="padding:0.3rem 0.5rem;text-transform:capitalize;">${m.mode}</td><td style="padding:0.3rem 0.5rem;">${m.time_percent}%</td><td style="padding:0.3rem 0.5rem;font-family:monospace;">${m.current_ua.toLocaleString()} µA</td><td style="padding:0.3rem 0.5rem;font-family:monospace;">${m.weighted_ua.toLocaleString()} µA</td></tr>`).join('');
+                const totals = d.totals;
+                res.innerHTML = `
+                    <div style="background:${lifeDays&&lifeDays>30?'#dcfce7':lifeDays&&lifeDays>1?'#fef9c3':'#fee2e2'};padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
+                        <div style="font-size:1.4rem;font-weight:800;color:#1e293b;">${(totals.total_avg_ma*1000).toFixed(1)} µA avg</div>
+                        <div style="font-size:0.85rem;color:#475569;">= ${totals.total_avg_ma.toFixed(4)} mA average current</div>
+                        ${batt.capacity_mah?`<div style="margin-top:0.4rem;font-size:1rem;font-weight:700;">🔋 ${batt.capacity_mah}mAh ${battery_chemistry}: <strong>${lifeStr}</strong></div>`:''}
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:1rem;">
+                        <thead style="background:#f1f5f9;"><tr><th style="padding:0.3rem 0.5rem;text-align:left;">Mode</th><th style="padding:0.3rem 0.5rem;">Time%</th><th style="padding:0.3rem 0.5rem;">Current</th><th style="padding:0.3rem 0.5rem;">Weighted</th></tr></thead>
+                        <tbody>${modeRows}</tbody>
+                        <tfoot style="border-top:2px solid #e2e8f0;font-weight:700;"><tr><td colspan="3" style="padding:0.3rem 0.5rem;">MCU avg</td><td style="padding:0.3rem 0.5rem;font-family:monospace;">${totals.mcu_avg_ua} µA</td></tr>
+                        <tr><td colspan="3" style="padding:0.3rem 0.5rem;">Peripherals avg</td><td style="padding:0.3rem 0.5rem;font-family:monospace;">${totals.peripheral_avg_ua} µA</td></tr>
+                        <tr><td colspan="3" style="padding:0.3rem 0.5rem;">Total avg</td><td style="padding:0.3rem 0.5rem;font-family:monospace;color:#2563eb;">${totals.total_avg_ua} µA</td></tr></tfoot>
+                    </table>
+                    ${tips?`<h4 style="margin:0 0 0.4rem;font-size:0.9rem;">💡 Optimization Tips</h4><ul style="margin:0;padding-left:1.2rem;line-height:1.6;">${tips}</ul>`:''}
+                    ${d.using_estimated_values?`<div style="margin-top:0.75rem;font-size:0.75rem;color:#94a3b8;">ⓘ Power figures are typical family estimates. Exact values may vary by device revision.</div>`:''}
+                `;
+            } catch(e) { res.innerHTML=`<span style="color:red">Error: ${e.message}</span>`; }
+        }
+
+        // ── Package & PCB Analyzer ──────────────────────────────────────────
+        async function analyzePackage(partId, mpn) {
+            const m = loadingModal(`📦 Package Analysis — ${mpn}`);
+            const body = m.querySelector('[style*="overflow:auto"]');
+            try {
+                const r = await fetch(`/api/parts/${partId}/package`);
+                const d = await r.json();
+                if (!r.ok) { body.innerHTML=`<span style="color:red">❌ ${d.detail}</span>`; return; }
+                const complexColor = {'Very Low':'#166534','Low':'#166534','Medium':'#92400e','High':'#991b1b','Very High':'#991b1b','Unknown':'#475569'};
+                const complexBg   = {'Very Low':'#dcfce7','Low':'#f0fdf4','Medium':'#fef9c3','High':'#fee2e2','Very High':'#fee2e2','Unknown':'#f8fafc'};
+                const cc = complexColor[d.complexity]||'#475569';
+                const cb = complexBg[d.complexity]||'#f8fafc';
+                const warnings = (d.warnings||[]).map(w=>`<li style="color:#991b1b;margin-bottom:4px;">${w}</li>`).join('');
+                const recs = (d.design_recommendations||[]).map(r=>`<li style="margin-bottom:6px;">${r}</li>`).join('');
+                body.innerHTML = `
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;">
+                        <div>
+                            <div style="background:${cb};color:${cc};padding:0.75rem 1rem;border-radius:8px;margin-bottom:1rem;">
+                                <div style="font-size:1.5rem;font-weight:800;">${d.package_family}</div>
+                                <div style="font-size:0.85rem;">${d.package_full_name}</div>
+                                <div style="margin-top:0.4rem;font-weight:700;font-size:1rem;">Complexity: ${d.complexity}</div>
+                            </div>
+                            <table style="width:100%;border-collapse:collapse;font-size:0.875rem;">
+                                ${[['Min PCB Layers',d.pcb_layers_min],['HDI Required',d.requires_hdi?'⚠️ YES':'✅ No'],['Hand Solderable',d.hand_solderable===true?'✅ Yes':d.hand_solderable===false?'❌ No':'?'],['Min Pitch',d.min_pitch_mm?d.min_pitch_mm+'mm':'?'],['Inspection',d.inspection_method],['Cost Multiplier',d.cost_multiplier.toFixed(2)+'×'],['Reflow Profile',d.reflow_profile]].map(([k,v])=>`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:0.4rem 0.5rem;color:#64748b;">${k}</td><td style="padding:0.4rem 0.5rem;font-weight:600;">${v}</td></tr>`).join('')}
+                            </table>
+                        </div>
+                        <div>
+                            ${d.warnings&&d.warnings.length?`<h4 style="color:#991b1b;margin:0 0 0.4rem;">⚠️ Warnings</h4><ul style="margin:0 0 1rem;padding-left:1.2rem;">${warnings}</ul>`:'<div style="color:#166534;font-weight:600;margin-bottom:1rem;">✅ No manufacturing warnings for this package.</div>'}
+                            <h4 style="margin:0 0 0.4rem;">🛠️ Design Recommendations</h4>
+                            <ul style="margin:0;padding-left:1.2rem;font-size:0.875rem;line-height:1.6;">${recs||'<li>No specific recommendations.</li>'}</ul>
+                            <div style="margin-top:1rem;padding:0.75rem;background:#f8fafc;border-radius:6px;font-size:0.82rem;color:#475569;">${d.cost_estimate_notes}</div>
+                        </div>
+                    </div>`;
+            } catch(e) { body.innerHTML=`<span style="color:red">Error: ${e.message}</span>`; }
+        }
+
+        // ── Ecosystem RAG ───────────────────────────────────────────────────
+        async function getEcosystem(partId, mpn) {
+            const m = loadingModal(`🔌 Ecosystem Chipset — ${mpn}`);
+            const body = m.querySelector('[style*="overflow:auto"]');
+            const reqText = document.getElementById('intentInput') ? document.getElementById('intentInput').value : '';
+            try {
+                const r = await fetch(`/api/parts/${partId}/ecosystem`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requirement_text:reqText})});
+                const d = await r.json();
+                if (!r.ok) { body.innerHTML=`<span style="color:red">❌ ${d.detail}</span>`; return; }
+                const catIcons = {can_transceiver:'🔌',motor_driver:'⚙️',imu:'📡',sensor:'🌡️',pmic:'⚡',ldo:'🔋',rs485:'📶'};
+                const catNames = {can_transceiver:'CAN Transceiver',motor_driver:'Motor Driver',imu:'IMU',sensor:'Sensor',pmic:'PMIC',ldo:'LDO Regulator',rs485:'RS-485'};
+                const byCategory = {};
+                (d.companions||[]).forEach(c => { if(!byCategory[c.category]) byCategory[c.category]=[]; byCategory[c.category].push(c); });
+                const sections = Object.entries(byCategory).map(([cat,chips]) => {
+                    const icon = catIcons[cat]||'🧩';
+                    const catName = catNames[cat]||cat;
+                    const cards = chips.map(chip=>`
+                        <div style="border:1px solid ${chip.compatibility_warning?'#fca5a5':'#e2e8f0'};border-radius:8px;padding:0.75rem;margin-bottom:0.5rem;background:${chip.compatibility_warning?'#fff5f5':'#fff'};">
+                            <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:0.3rem;">
+                                <div><strong>${chip.mpn}</strong> <span style="color:#64748b;font-size:0.8rem;">${chip.manufacturer}</span></div>
+                                ${chip.cost_usd?`<span style="background:#f0fdf4;color:#166534;padding:0.15rem 0.4rem;border-radius:4px;font-weight:700;font-size:0.82rem;">$${chip.cost_usd.toFixed(2)}</span>`:''}
+                            </div>
+                            <div style="font-size:0.82rem;color:#475569;margin-bottom:0.3rem;">${chip.description}</div>
+                            <div style="font-size:0.78rem;color:#2563eb;">${chip.match_reason}</div>
+                            ${chip.compatibility_warning?`<div style="font-size:0.78rem;color:#991b1b;margin-top:0.25rem;">${chip.compatibility_warning}</div>`:''}
+                            <div style="margin-top:0.3rem;font-size:0.75rem;color:#64748b;">Interface: ${chip.interface||'?'} · Logic: ${chip.logic_level_v||'?'}V · Package: ${chip.package||'?'}</div>
+                        </div>`).join('');
+                    return `<div style="margin-bottom:1.25rem;"><h4 style="margin:0 0 0.5rem;color:#1e293b;">${icon} ${catName}</h4>${cards}</div>`;
+                }).join('');
+                const intNotes = (d.integration_notes||[]).map(n=>`<li style="margin-bottom:4px;">${n}</li>`).join('');
+                const totalCost = d.total_bom_cost_usd ? `$${d.total_bom_cost_usd.toFixed(2)}` : 'N/A';
+                body.innerHTML = `
+                    <div style="background:#eff6ff;padding:0.75rem 1rem;border-radius:8px;margin-bottom:1.25rem;font-size:0.875rem;">
+                        <strong>Chipset Summary:</strong> ${d.chipset_summary}<br>
+                        <span style="color:#0369a1;">MCU logic: ${d.mcu_logic_v}V · Companion BOM cost: ${totalCost}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;">
+                        <div>${sections||'<p style="color:#94a3b8;">No companion chips matched for these requirements.</p>'}</div>
+                        <div>
+                            <h4 style="margin:0 0 0.5rem;">🔧 Integration Notes</h4>
+                            <ul style="margin:0;padding-left:1.1rem;font-size:0.82rem;line-height:1.6;">${intNotes}</ul>
+                        </div>
+                    </div>`;
+            } catch(e) { body.innerHTML=`<span style="color:red">Error: ${e.message}</span>`; }
         }
 
         async function peerReview(partId = null) {

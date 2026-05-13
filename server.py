@@ -368,11 +368,96 @@ async def solve_pin_mux(part_id: str, requirements: List[Dict]):
 
 @app.post("/api/parts/{part_id}/power")
 async def calculate_power(part_id: str, request: Dict):
-    from solver.power_budget_calculator import PowerBudgetCalculator, ModeProfile, PowerMode
-    calc = PowerBudgetCalculator(db.pool)
-    profiles = [ModeProfile(PowerMode.RUN, request.get('run_percent', 100))]
-    budget = await calc.calculate_total_budget(part_id, profiles, [], [])
-    return {"avg_current_ma": budget.total_current_ma, "total_power_uw": budget.total_power_uw}
+    """
+    Advanced Power Profiler & Battery Life Estimator.
+    Accepts duty cycle modes, peripheral usage, and battery specs.
+    Returns full power breakdown + battery lifetime estimate.
+    """
+    try:
+        from solver.power_profiler import PowerProfiler, profile_to_dict
+        profiler = PowerProfiler(db.pool)
+        result = await profiler.compute(
+            part_id=part_id,
+            modes=request.get("modes", [{"name": "run", "percent": 100}]),
+            peripherals=request.get("peripherals", []),
+            external_loads=request.get("external_loads", []),
+            battery_mah=request.get("battery_mah"),
+            battery_chemistry=request.get("battery_chemistry", "Li-Po"),
+            system_voltage_v=request.get("system_voltage_v", 3.3),
+        )
+        return profile_to_dict(result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Power profiler error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/parts/{part_id}/replacements")
+async def find_drop_in_replacements(part_id: str, request: Dict = {}):
+    """
+    Drop-In Replacement Engine.
+    Finds the best replacement MCUs ranked by schematic rework level.
+    Returns scoring breakdown across package / core / peripheral / voltage axes.
+    """
+    try:
+        from solver.drop_in_finder import DropInFinder
+        finder = DropInFinder(db.pool)
+        result = await finder.find(
+            part_id=part_id,
+            max_results=request.get("max_results", 8) if request else 8,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Drop-in finder error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/parts/{part_id}/package")
+async def get_package_analysis(part_id: str):
+    """
+    Package & PCB Manufacturing Cost Analyzer.
+    Returns complexity rating, layer count, HDI requirement, cost multiplier,
+    warnings, and design recommendations for the part's package.
+    """
+    try:
+        from solver.package_analyzer import PackageAnalyzer, analysis_to_dict
+        analyzer = PackageAnalyzer(db.pool)
+        result = await analyzer.analyze(part_id)
+        return analysis_to_dict(result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Package analysis error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/parts/{part_id}/ecosystem")
+async def get_ecosystem_recommendations(part_id: str, request: Dict = {}):
+    """
+    Ecosystem RAG — Companion Chip Recommender.
+    Matches CAN transceivers, motor drivers, IMUs, PMICs, LDOs and RS-485
+    transceivers to the selected MCU based on application requirements.
+    Returns logic-level-compatible, interface-matched chipset recommendations.
+    """
+    try:
+        from solver.ecosystem_rag import EcosystemRAG, ecosystem_to_dict
+        rag = EcosystemRAG(db.pool)
+        requirement_text = (request or {}).get("requirement_text", "")
+        spec_dict = (request or {}).get("spec", None)
+        result = await rag.recommend(
+            part_id=part_id,
+            requirement_text=requirement_text,
+            spec_dict=spec_dict,
+        )
+        return ecosystem_to_dict(result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Ecosystem RAG error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/compare")
