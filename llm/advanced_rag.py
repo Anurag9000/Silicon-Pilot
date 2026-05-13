@@ -1,25 +1,17 @@
 """
-Advanced RAG Module
-
-Implements retrieval techniques from RigorousRAG:
-1. HyDe (Hypothetical Document Embeddings)
-2. Multi-Query Expansion
+Advanced RAG Module — provider/model from core/llm_config.py
 """
 import logging
 from typing import List, Dict, Any, Optional
-from openai import AsyncOpenAI
+import core.llm_config as llm_cfg
 
 logger = logging.getLogger(__name__)
 
 class AdvancedRAG:
-    def __init__(self, api_key: str, base_url: Optional[str] = None, model: str = "gpt-4o-mini"):
-        import httpx
-        self.client = AsyncOpenAI(
-            api_key=api_key, 
-            base_url=base_url,
-            timeout=httpx.Timeout(300.0, connect=10.0)
-        )
-        self.model = model
+    def __init__(self, api_key=None, base_url=None, model: str | None = None):
+        """All args optional — falls back to core/llm_config.py."""
+        self.model = model or llm_cfg.LLM_MODEL
+        self.client = llm_cfg.get_async_openai_client()
 
     async def generate_hyde_query(self, query: str) -> str:
         """

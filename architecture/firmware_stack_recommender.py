@@ -74,31 +74,50 @@ class StackRecommendation:
 
 class FirmwareStackRecommender:
     """Recommend firmware stacks"""
-    
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+
+    def __init__(self, db_pool):
+        # Accept asyncpg.Pool (preferred) or URL string (legacy)
+        if isinstance(db_pool, str):
+            import warnings
+            warnings.warn(
+                "FirmwareStackRecommender: pass an asyncpg.Pool, not a URL string.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self._db_url = db_pool
+            self._pool   = None
+        else:
+            self._db_url = None
+            self._pool   = db_pool
+
+    async def _get_conn(self):
+        """Acquire a connection from pool, or open a direct connection from URL."""
+        if self._pool is not None:
+            return self._pool.acquire()
+        return await asyncpg.connect(self._db_url)
     
     async def get_mcu_resources(self, part_id: uuid.UUID) -> Dict[str, int]:
-        """Get MCU Flash and RAM"""
-        conn = await asyncpg.connect(self.db_url)
-        
+        """Get MCU Flash, SRAM and core from mcu_specs."""
+        conn = await asyncpg.connect(self._db_url) if self._pool is None else await self._pool.acquire()
+        release = self._pool is not None
         try:
             resources = await conn.fetchrow("""
-                SELECT m.flash_kb, m.ram_kb, m.core
+                SELECT m.flash_kb, m.sram_kb, m.core
                 FROM mcu_specs m
                 WHERE m.part_id = $1
             """, part_id)
-            
             if resources:
                 return {
                     'flash_kb': resources['flash_kb'],
-                    'ram_kb': resources['ram_kb'],
-                    'core': resources['core']
+                    'ram_kb':   resources['sram_kb'],   # normalised name
+                    'core':     resources['core'],
                 }
             return {}
-            
         finally:
-            await conn.close()
+            if release:
+                await self._pool.release(conn)  # type: ignore[union-attr]
+            else:
+                await conn.close()
     
     async def find_stacks(self, stack_type: StackType,
                          max_flash_kb: Optional[int] = None,
@@ -110,8 +129,8 @@ class FirmwareStackRecommender:
         """
         Find firmware stacks matching criteria
         """
-        conn = await asyncpg.connect(self.db_url)
-        
+        conn = await asyncpg.connect(self._db_url) if self._pool is None else await self._pool.acquire()
+        release = self._pool is not None
         try:
             # Build query
             query = """
@@ -218,7 +237,10 @@ class FirmwareStackRecommender:
             return recommendations
             
         finally:
-            await conn.close()
+            if release:
+                await self._pool.release(conn)  # type: ignore[union-attr]
+            else:
+                await conn.close()
     
     async def recommend_for_mcu(self, part_id: uuid.UUID,
                                 requirements: List[StackRequirement],
@@ -269,7 +291,8 @@ class FirmwareStackRecommender:
                                 documentation_url: str = None,
                                 repository_url: str = None) -> uuid.UUID:
         """Add a firmware stack to the database"""
-        conn = await asyncpg.connect(self.db_url)
+        conn = await asyncpg.connect(self._db_url) if self._pool is None else await self._pool.acquire()
+        release = self._pool is not None
         
         try:
             stack_id = await conn.fetchval("""
@@ -290,14 +313,17 @@ class FirmwareStackRecommender:
             return stack_id
             
         finally:
-            await conn.close()
+            if release:
+                await self._pool.release(conn)  # type: ignore[union-attr]
+            else:
+                await conn.close()
 
 
 # Example usage
 async def main():
     import os
     
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.environ["DATABASE_URL"]
     recommender = FirmwareStackRecommender(db_url)
     
     # Example: Recommend stacks for an MCU

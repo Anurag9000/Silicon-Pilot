@@ -17,6 +17,7 @@ import json
 
 from core.ontology import DeviceType, InterfaceType, EnvironmentType
 from templates.template_system import TemplateLoader, DeviceTemplate
+import core.llm_config as llm_cfg
 
 try:
     from openai import OpenAI
@@ -59,14 +60,10 @@ class IntentParser:
     - Domain-specific parameters
     """
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4"):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = model
-        
-        if OpenAI and self.api_key:
-            self.client = OpenAI(api_key=self.api_key)
-        else:
-            self.client = None
+    def __init__(self, api_key: Optional[str] = None, model: str | None = None, use_llm: bool = True):
+        self.model = model or llm_cfg.MODEL_PARSER
+        # Always build client from central config (points to Ollama by default)
+        self.client = llm_cfg.get_openai_client() if use_llm else None
     
     def classify(self, user_input: str) -> ExtractedIntent:
         """

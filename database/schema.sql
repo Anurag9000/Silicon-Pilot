@@ -390,3 +390,244 @@ COMMENT ON COLUMN documents.source_type IS 'mfg_pdf, mfg_html, dist_html, other'
 COMMENT ON COLUMN parts.status IS 'active, nrnd, eol, unknown';
 COMMENT ON COLUMN conflicts.status IS 'open, resolved, ignored';
 COMMENT ON COLUMN extraction_runs.status IS 'success, partial, failed';
+
+-- ============================================================================
+-- COMPONENT SPEC TABLES (previously missing — required by hard_filter, drc, bom_checker)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS ldo_specs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
+    vin_min_v  DECIMAL(5,2),
+    vin_max_v  DECIMAL(5,2),
+    vout_fixed_v DECIMAL(5,2),
+    vout_adj_min_v DECIMAL(5,2),
+    vout_adj_max_v DECIMAL(5,2),
+    iout_max_ma  DECIMAL(8,2),
+    dropout_mv   DECIMAL(6,2),
+    quiescent_ua DECIMAL(8,2),
+    package      VARCHAR(50),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ldo_specs_part ON ldo_specs(part_id);
+
+CREATE TABLE IF NOT EXISTS pmic_specs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
+    vin_min_v  DECIMAL(5,2),
+    vin_max_v  DECIMAL(5,2),
+    buck_count INTEGER DEFAULT 0,
+    ldo_count  INTEGER DEFAULT 0,
+    boost_count INTEGER DEFAULT 0,
+    total_iout_max_a DECIMAL(6,2),
+    has_usb_charger BOOLEAN DEFAULT FALSE,
+    has_fuel_gauge  BOOLEAN DEFAULT FALSE,
+    interface       VARCHAR(50),  -- I2C, SPI, etc.
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pmic_specs_part ON pmic_specs(part_id);
+
+CREATE TABLE IF NOT EXISTS can_specs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
+    can_fd_support   BOOLEAN DEFAULT FALSE,
+    max_baudrate_mbps DECIMAL(4,2),
+    vcc_min_v   DECIMAL(5,2),
+    vcc_max_v   DECIMAL(5,2),
+    has_isolation BOOLEAN DEFAULT FALSE,
+    package       VARCHAR(50),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_can_specs_part ON can_specs(part_id);
+
+CREATE TABLE IF NOT EXISTS sensor_specs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
+    sensor_type   VARCHAR(50) NOT NULL,  -- temperature, humidity, pressure, accelerometer, etc.
+    interface     VARCHAR(50),           -- I2C, SPI, UART
+    range_min     DECIMAL(10,4),
+    range_max     DECIMAL(10,4),
+    range_unit    VARCHAR(20),
+    resolution    DECIMAL(10,6),
+    accuracy      DECIMAL(8,4),
+    current_ua    DECIMAL(10,2),
+    vdd_min_v     DECIMAL(5,2),
+    vdd_max_v     DECIMAL(5,2),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sensor_specs_part ON sensor_specs(part_id);
+CREATE INDEX IF NOT EXISTS idx_sensor_specs_type ON sensor_specs(sensor_type);
+
+CREATE TABLE IF NOT EXISTS passive_specs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
+    component_type VARCHAR(50) NOT NULL,  -- resistor, capacitor, inductor, crystal
+    value_nominal  DECIMAL(18,6),
+    value_unit     VARCHAR(20),           -- ohm, F, H, Hz
+    tolerance_pct  DECIMAL(6,3),
+    voltage_rating_v DECIMAL(8,2),
+    current_rating_a DECIMAL(8,4),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_passive_specs_part ON passive_specs(part_id);
+CREATE INDEX IF NOT EXISTS idx_passive_specs_type ON passive_specs(component_type);
+
+CREATE TABLE IF NOT EXISTS dcdc_specs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL UNIQUE REFERENCES parts(id) ON DELETE CASCADE,
+    topology      VARCHAR(50),   -- buck, boost, buck-boost, flyback
+    vin_min_v     DECIMAL(5,2),
+    vin_max_v     DECIMAL(5,2),
+    vout_min_v    DECIMAL(5,2),
+    vout_max_v    DECIMAL(5,2),
+    iout_max_a    DECIMAL(6,3),
+    efficiency_pct DECIMAL(5,2),
+    switching_freq_khz INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_dcdc_specs_part ON dcdc_specs(part_id);
+
+-- ============================================================================
+-- POWER BUDGET TABLES (required by power_budget_calculator.py)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS power_modes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+    mode_name     VARCHAR(50) NOT NULL,  -- run, sleep, stop, standby, shutdown
+    voltage_v     DECIMAL(5,3),
+    current_typ_ua DECIMAL(12,3),
+    frequency_mhz INTEGER,
+    wake_latency_us INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(part_id, mode_name)
+);
+CREATE INDEX IF NOT EXISTS idx_power_modes_part ON power_modes(part_id);
+
+CREATE TABLE IF NOT EXISTS peripheral_power (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    part_id UUID NOT NULL REFERENCES parts(id) ON DELETE CASCADE,
+    peripheral_type     VARCHAR(50) NOT NULL,   -- uart, spi, i2c, can, usb, adc, dac, timer
+    peripheral_instance VARCHAR(50),            -- UART1, SPI2, etc.
+    current_typ_ua DECIMAL(12,3),
+    voltage_v      DECIMAL(5,3),
+    notes          TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_peripheral_power_part ON peripheral_power(part_id);
+CREATE INDEX IF NOT EXISTS idx_peripheral_power_type ON peripheral_power(part_id, peripheral_type);
+
+-- ============================================================================
+-- FIRMWARE STACKS TABLE (required by firmware_stack_recommender.py)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS firmware_stacks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    stack_name     VARCHAR(200) NOT NULL UNIQUE,
+    stack_type     VARCHAR(50) NOT NULL,        -- rtos, tcp_ip, usb, filesystem, crypto, gui, ble
+    vendor         VARCHAR(100),
+    version        VARCHAR(50),
+    license        VARCHAR(100),
+    flash_typical_kb INTEGER,
+    ram_typical_kb   INTEGER,
+    supported_cores  TEXT[],                    -- ["Cortex-M4", "Cortex-M7", ...]
+    features         TEXT[],
+    protocols        TEXT[],
+    documentation_url TEXT,
+    repository_url    TEXT,
+    popularity_score  INTEGER DEFAULT 50,       -- 0-100
+    maturity_score    INTEGER DEFAULT 50,
+    community_score   INTEGER DEFAULT 50,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_firmware_stacks_type ON firmware_stacks(stack_type);
+
+-- Seed essential firmware stacks
+INSERT INTO firmware_stacks (stack_name, stack_type, vendor, version, license, flash_typical_kb, ram_typical_kb,
+    supported_cores, features, protocols, documentation_url, repository_url, popularity_score, maturity_score, community_score)
+VALUES
+  ('FreeRTOS', 'rtos', 'Amazon', '10.6', 'MIT', 10, 5, ARRAY['Cortex-M0','Cortex-M0+','Cortex-M3','Cortex-M4','Cortex-M7','Cortex-M33'],
+   ARRAY['preemptive','tickless','co-routines','idle-hooks'], ARRAY[]::TEXT[],
+   'https://freertos.org', 'https://github.com/FreeRTOS/FreeRTOS', 95, 95, 90),
+  ('Zephyr RTOS', 'rtos', 'Linux Foundation', '3.5', 'Apache-2.0', 60, 20, ARRAY['Cortex-M0','Cortex-M0+','Cortex-M3','Cortex-M4','Cortex-M7','Cortex-M33'],
+   ARRAY['preemptive','tickless','device-model','logging'], ARRAY['BLE','LoRa','CAN','Ethernet'],
+   'https://docs.zephyrproject.org', 'https://github.com/zephyrproject-rtos/zephyr', 85, 85, 80),
+  ('lwIP', 'tcp_ip', 'Community', '2.2', 'BSD', 100, 80, ARRAY['Cortex-M3','Cortex-M4','Cortex-M7'],
+   ARRAY['sockets','raw-api'], ARRAY['IPv4','IPv6','TCP','UDP','HTTP','MQTT','DNS'],
+   'https://savannah.nongnu.org/projects/lwip/', 'https://github.com/lwip-tcpip/lwip', 90, 90, 80),
+  ('TinyUSB', 'usb', 'hathach', '0.16', 'MIT', 20, 8, ARRAY['Cortex-M0','Cortex-M0+','Cortex-M3','Cortex-M4','Cortex-M7'],
+   ARRAY['device','host','cdc','msc','hid','dfu'], ARRAY['USB-FS','USB-HS'],
+   'https://docs.tinyusb.org', 'https://github.com/hathach/tinyusb', 85, 80, 85),
+  ('FatFs', 'filesystem', 'ChaN', 'R0.15', 'MIT', 12, 2, ARRAY['Cortex-M0','Cortex-M0+','Cortex-M3','Cortex-M4','Cortex-M7'],
+   ARRAY['fat12','fat16','fat32','exfat'], ARRAY[]::TEXT[],
+   'http://elm-chan.org/fsw/ff/', NULL, 90, 95, 70),
+  ('LittleFS', 'filesystem', 'ARM', '2.8', 'BSD', 16, 4, ARRAY['Cortex-M0','Cortex-M0+','Cortex-M3','Cortex-M4','Cortex-M7'],
+   ARRAY['power-loss-resilient','wear-leveling'], ARRAY[]::TEXT[],
+   'https://github.com/littlefs-project/littlefs', 'https://github.com/littlefs-project/littlefs', 80, 85, 75),
+  ('mbedTLS', 'crypto', 'ARM', '3.5', 'Apache-2.0', 200, 50, ARRAY['Cortex-M3','Cortex-M4','Cortex-M7','Cortex-M33'],
+   ARRAY['tls','x509','aes','rsa','ecdsa','sha'], ARRAY['TLS1.2','TLS1.3'],
+   'https://tls.mbed.org', 'https://github.com/Mbed-TLS/mbedtls', 85, 85, 80),
+  ('LVGL', 'gui', 'LVGL Kft', '9.0', 'MIT', 150, 32, ARRAY['Cortex-M4','Cortex-M7'],
+   ARRAY['widgets','animations','themes','touchscreen'], ARRAY[]::TEXT[],
+   'https://lvgl.io', 'https://github.com/lvgl/lvgl', 90, 85, 90)
+ON CONFLICT (stack_name) DO NOTHING;
+
+-- ============================================================================
+-- REFERENCE DESIGNS TABLE (required by reference_design_matcher.py)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS reference_designs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    design_name      VARCHAR(200) NOT NULL,
+    design_code      VARCHAR(100) NOT NULL UNIQUE,
+    manufacturer     VARCHAR(100) NOT NULL,
+    application_area VARCHAR(100),         -- motor-control, IoT, industrial, audio, etc.
+    description      TEXT,
+    mcu_part_ids     UUID[],               -- MCUs featured in this design
+    required_peripherals TEXT[],
+    schematic_url    TEXT,
+    bom_url          TEXT,
+    gerber_url       TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ref_designs_app ON reference_designs(application_area);
+CREATE INDEX IF NOT EXISTS idx_ref_designs_mfr ON reference_designs(manufacturer);
+
+-- ============================================================================
+-- USER SELECTIONS TABLE (required by ml/ranker.py for training)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS user_selections (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id       UUID REFERENCES user_sessions(id) ON DELETE SET NULL,
+    query_text       TEXT NOT NULL,
+    query_type       VARCHAR(50) DEFAULT 'search',
+    results_shown    UUID[],
+    result_count     INTEGER,
+    selected_part_id UUID REFERENCES parts(id) ON DELETE SET NULL,
+    selection_rank   INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_selections_session ON user_selections(session_id);
+CREATE INDEX IF NOT EXISTS idx_user_selections_part ON user_selections(selected_part_id);
+
+-- ============================================================================
+-- DRC VIOLATIONS TABLE (required by design_rule_checker.py save_violations)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS drc_violations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    design_id    UUID,               -- logical design group (not FK — designs not persisted)
+    rule_id      VARCHAR(20) NOT NULL,
+    rule_name    VARCHAR(200),
+    severity     VARCHAR(20) NOT NULL DEFAULT 'error',  -- error, warning, info
+    part_id      UUID REFERENCES parts(id) ON DELETE SET NULL,
+    component    VARCHAR(100),
+    message      TEXT NOT NULL,
+    recommendation TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_drc_violations_design ON drc_violations(design_id);
+CREATE INDEX IF NOT EXISTS idx_drc_violations_rule   ON drc_violations(rule_id);
+CREATE INDEX IF NOT EXISTS idx_drc_violations_sev    ON drc_violations(severity);
+

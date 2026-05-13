@@ -13,11 +13,7 @@ from typing import Dict, List, Any, Optional
 from pydantic import BaseModel, Field
 import json
 import os
-
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+import core.llm_config as llm_cfg
 
 
 # ============================================================================
@@ -58,14 +54,9 @@ class IntelligentConstraintOptimizer:
     4. Balancing trade-offs
     """
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4"):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = model
-        
-        if OpenAI and self.api_key:
-            self.client = OpenAI(api_key=self.api_key)
-        else:
-            self.client = None
+    def __init__(self, api_key: Optional[str] = None, model: str | None = None):
+        self.model = model or llm_cfg.MODEL_PARSER
+        self.client = llm_cfg.get_openai_client()
     
     def optimize_constraints(
         self,

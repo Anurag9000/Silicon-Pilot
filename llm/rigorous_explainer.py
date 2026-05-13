@@ -1,28 +1,42 @@
 """
 Rigorous Explainer Module
 
-Implements advanced explainability features inspired by RigorousRAG:
-1. Comparison Matrix
-2. Multi-Agent Debate (Choice Justification)
-3. Evidence Grounding
+All model/provider config is read from core.llm_config — change one file to
+switch the entire repo between Ollama, OpenAI, or any other provider.
 """
 import json
 import logging
+from datetime import datetime
 from typing import List, Dict, Any, Optional
-from openai import AsyncOpenAI
+from uuid import UUID
 from core.models import RequirementSpec
+import core.llm_config as llm_cfg
 
 logger = logging.getLogger(__name__)
 
+
+def _json_safe(obj):
+    """JSON serializer that handles UUID, datetime, Decimal, and bytes objects."""
+    if isinstance(obj, UUID):
+        return str(obj)
+    from datetime import datetime, date
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    from decimal import Decimal
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace")
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
 class RigorousExplainer:
-    def __init__(self, api_key: str, base_url: Optional[str] = None, model: str = "gpt-4o"):
-        import httpx
-        self.client = AsyncOpenAI(
-            api_key=api_key, 
-            base_url=base_url,
-            timeout=httpx.Timeout(300.0, connect=10.0)
-        )
-        self.model = model
+    def __init__(self,
+                 api_key: str | None = None,
+                 base_url: str | None = None,
+                 model: str | None = None):
+        """All args optional — falls back to core/llm_config.py."""
+        self.model = model or llm_cfg.MODEL_DEBATE
+        self.client = llm_cfg.get_async_openai_client()
 
     async def generate_comparison_matrix(
         self, 
@@ -56,7 +70,7 @@ Format the output as a JSON object with:
 {spec.model_dump_json(indent=2)}
 
 Candidates:
-{json.dumps(candidates[:3], indent=2)}
+{json.dumps(candidates[:3], indent=2, default=_json_safe)}
 """
 
         response = await self.client.chat.completions.create(
@@ -256,7 +270,7 @@ Cover ALL: Flash, RAM, MHz, CAN interfaces, ADC, SPI, I2C, USB, Timers, FPU, vol
 {spec.model_dump_json(indent=2)}
 
 ## Component Record: {candidate.get('mpn')}
-{json.dumps(combined_specs, indent=2)}
+{json.dumps(combined_specs, indent=2, default=_json_safe)}
 {pdf_block}
 
 Perform exhaustive, traceable, line-by-line verification of every parameter above."""

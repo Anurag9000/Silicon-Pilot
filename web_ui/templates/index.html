@@ -172,19 +172,14 @@
 
             <div class="card">
                 <h2>Admin</h2>
+                <p style="font-size:0.82rem;color:#64748b;margin:0 0 0.75rem 0;">Connected to live PostgreSQL database (461 STM32 boards).</p>
                 <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                    <button id="ingestBtn" onclick="triggerIngestion('mock')" style="background-color: #475569; flex:1;">Restore Mock DB</button>
-                    <button id="prodIngestBtn" onclick="triggerIngestion('production')" style="background-color: #1e293b; flex:1;">Run Real Pipeline</button>
-                </div>
-                
-                <div id="swapWrapper" style="display:none; margin-top:1rem; padding:1rem; background:#ecfdf5; border:1px solid #10b981; border-radius:6px;">
-                    <p style="margin:0 0 0.5rem 0; font-size:0.85rem; color:#065f46; font-weight:600;">✓ Production Data Ready</p>
-                    <button onclick="hotSwap()" style="width:100%; background:#10b981; color:white; border:none; padding:0.5rem; border-radius:4px; cursor:pointer; font-weight:600;">Hot-Swap to Production</button>
+                    <button id="prodIngestBtn" onclick="triggerIngestion('production')" style="background-color: #1e293b; flex:1;">🔄 Run Production Ingestion</button>
                 </div>
                 
                 <div id="progressWrapper" style="display:none; margin-top:1rem;">
                     <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem; font-size:0.8rem;">
-                        <span id="progressMsg">Restoring...</span>
+                        <span id="progressMsg">Starting...</span>
                         <span id="progressPct">0%</span>
                     </div>
                     <div style="width:100%; height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden;">
@@ -271,87 +266,120 @@
         let currentSpecId = null;
         let topCandidateId = null;
 
+        function setStatusTicker(msg, phase) {
+            const phases = [
+                { id: 1, label: 'Phase 1: Parsing natural language requirements via Ollama…' },
+                { id: 2, label: 'Phase 2: Filtering database & ranking candidates with LLM…' },
+            ];
+            const container = document.getElementById('resultsList');
+            const dots = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+            let i = 0;
+            clearInterval(window._tickerInterval);
+            const stepsHtml = phases.map(p => {
+                const done = p.id < phase;
+                const active = p.id === phase;
+                return `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;font-size:0.9rem;color:${done?'#16a34a':active?'#1e40af':'#94a3b8'};">
+                    <span id="phase-icon-${p.id}">${done?'✅':active?dots[0]:'○'}</span>
+                    <span>${p.label}</span>
+                </div>`;
+            }).join('');
+            container.innerHTML = `
+                <div style="padding:1.5rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin:0.5rem 0;">
+                    <div style="font-weight:700;color:#1e293b;margin-bottom:0.75rem;">🔍 ${msg}</div>
+                    ${stepsHtml}
+                    <div style="margin-top:0.75rem;font-size:0.8rem;color:#64748b;">Local Ollama (qwen2.5:1.5b) is running on GPU — typically 5–30 seconds. Please wait…</div>
+                </div>`;
+            window._tickerInterval = setInterval(() => {
+                i = (i+1) % dots.length;
+                const el = document.getElementById(`phase-icon-${phase}`);
+                if (el) el.textContent = dots[i];
+            }, 100);
+        }
+
         async function parseRequirements() {
-            const text = document.getElementById('intentInput').value;
+            const text = document.getElementById('intentInput').value.trim();
             if (!text) return;
 
-            // CLEAR STATE IMMEDIATELY
-            document.getElementById('resultsList').innerHTML = '<p style="text-align:center;">Analyzing requirements... (this may take a few minutes for deep reasoning)</p>';
-            document.getElementById('pm-results').textContent = "Waiting for backend analysis...";
             topCandidateId = null;
+            document.getElementById('pm-results').textContent = 'Waiting for backend analysis…';
+            document.getElementById('specCard').style.display = 'none';
+            document.getElementById('questionsCard').style.display = 'none';
 
-            setLoading(true);
+            // ── Phase 1: spec/from_text ──
+            setStatusTicker('Analyzing requirements…', 1);
+            let specData;
             try {
                 const res = await fetch('/spec/from_text', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text })
                 });
-                const data = await res.json();
-
-                currentSpecId = data.spec_id;
-                renderSpec(data.spec);
-
-                // Re-fetch recommendations
-                await fetchRecommendations();
-                
-                // AUTO-SELECT TOP PART FOR USER
-                setTimeout(() => {
-                    const firstCard = document.querySelector('.part-card');
-                    if (firstCard) {
-                        console.log("Found candidate! Auto-solving...");
-                        firstCard.click();
-                        solvePinMux();
-                    }
-                }, 1000);
-
-                // If questions, show them
-                if (data.questions && data.questions.length > 0) {
-                    renderQuestions(data.questions);
-                } else {
-                    document.getElementById('questionsCard').style.display = 'none';
-                }
-
+                if (!res.ok) throw new Error(`Server error ${res.status}: ${await res.text()}`);
+                specData = await res.json();
             } catch (e) {
-                document.getElementById('resultsList').innerHTML = `<p style="color:red;">Error: ${e.message}</p>`;
+                clearInterval(window._tickerInterval);
+                document.getElementById('resultsList').innerHTML =
+                    `<div style="color:red;padding:1rem;background:#fef2f2;border-radius:8px;">❌ Parsing failed: ${e.message}</div>`;
+                return;
             }
-            setLoading(false);
+
+            currentSpecId = specData.spec_id;
+            renderSpec(specData.spec);
+            if (specData.questions && specData.questions.length > 0) renderQuestions(specData.questions);
+
+            // ── Phase 2: /recommend ──
+            setStatusTicker('Fetching & ranking candidates…', 2);
+            await fetchRecommendations();
+            clearInterval(window._tickerInterval);
+
+            // Auto-fill pin mux part ID
+            setTimeout(() => {
+                const firstCard = document.querySelector('.part-card');
+                if (firstCard) firstCard.click();
+            }, 500);
         }
 
         async function fetchRecommendations() {
-            const res = await fetch('/recommend', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ spec_id: currentSpecId })
-            });
-            const data = await res.json();
+            let data;
+            try {
+                const res = await fetch('/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ spec_id: currentSpecId, max_results: 8 })
+                });
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`HTTP ${res.status}: ${errText}`);
+                }
+                data = await res.json();
+            } catch(e) {
+                document.getElementById('resultsList').innerHTML =
+                    `<div style="color:red;padding:1rem;background:#fef2f2;border-radius:8px;">❌ Recommendation engine failed: ${e.message}</div>`;
+                return;
+            }
             if (data.candidates && data.candidates.length > 0) {
                 topCandidateId = data.candidates[0].part.id;
             }
-            renderCandidates(data.candidates);
+            renderCandidates(data.candidates, data);
         }
 
         async function triggerIngestion(mode) {
-            const btn = document.getElementById('ingestBtn');
             const pBtn = document.getElementById('prodIngestBtn');
             const wrapper = document.getElementById('progressWrapper');
             const bar = document.getElementById('progressBar');
             const pct = document.getElementById('progressPct');
             const msg = document.getElementById('progressMsg');
-            const swapWrapper = document.getElementById('swapWrapper');
             
-            btn.disabled = true;
             pBtn.disabled = true;
             wrapper.style.display = 'block';
-            swapWrapper.style.display = 'none';
             bar.style.width = '1%';
             pct.innerText = '1%';
-            msg.innerText = "Initializing...";
+            msg.innerText = "Initializing production ingestion...";
             
             // Start the ingestion via standard POST
-            await fetch(`/admin/ingest?mode=${mode}`, { method: 'POST' });
+            await fetch(`/admin/ingest?mode=production`, { method: 'POST' });
             
-            console.log("Starting SSE stream for mode:", mode);
+            console.log("Starting SSE stream for production ingestion");
             
             // Listen for progress via SSE
             const eventSource = new EventSource('/api/ingest/status');
@@ -376,19 +404,15 @@
                     if (data.status === 'complete' || data.status === 'error') {
                         console.log("SSE task finished:", data.status);
                         eventSource.close();
-                        btn.disabled = false;
                         pBtn.disabled = false;
                         
                         if (data.status === 'complete') {
-                            if (mode === 'production') {
-                                swapWrapper.style.display = 'block';
-                            } else {
-                                // FORCE BACKEND REWIRE TO MOCK
-                                fetch('/api/ingest/reset_mock', { method: 'POST' })
-                                    .then(() => console.log("Backend rewired to Mock"));
-                                setTimeout(() => wrapper.style.display = 'none', 3000);
-                            }
-                        }                    }
+                            msg.innerText = '✅ Ingestion complete! Data is live in PostgreSQL.';
+                            setTimeout(() => wrapper.style.display = 'none', 4000);
+                        } else {
+                            msg.innerText = '❌ Ingestion error: ' + data.message;
+                        }
+                    }
                 } catch (err) {
                     console.error("Error parsing SSE data:", err);
                 }
@@ -396,10 +420,8 @@
             
             eventSource.onerror = (err) => {
                 console.error("SSE Error occurred:", err);
-                // Don't close immediately if it's just a transient glitch
                 if (eventSource.readyState === EventSource.CLOSED) {
                     msg.innerText = "Connection lost. Retrying...";
-                    // Backend has 'retry: 1000' so the browser will try to reconnect automatically
                 }
             };
         }
@@ -457,15 +479,38 @@
             document.getElementById('questionsCard').style.display = 'block';
         }
 
-        function renderCandidates(candidates) {
+        function renderCandidates(candidates, rawData) {
             const container = document.getElementById('resultsList');
             if (!candidates || candidates.length === 0) {
-                container.innerHTML = '<p>No candidates found matching constraints.</p>';
+                // Show debug info so user understands what happened
+                const filtered = rawData && rawData.parts_after_hard_filter != null ? rawData.parts_after_hard_filter : '?';
+                const total = rawData && rawData.total_parts_in_db != null ? rawData.total_parts_in_db : '?';
+                const summary = rawData && rawData.constraint_summary ? JSON.stringify(rawData.constraint_summary, null, 2) : '';
+                container.innerHTML = `
+                    <div style="padding:1.25rem;background:#fffbeb;border:1px solid #fbbf24;border-radius:10px;">
+                        <div style="font-weight:700;color:#92400e;font-size:1rem;margin-bottom:0.5rem;">⚠️ No candidates passed the hard filter.</div>
+                        <div style="font-size:0.875rem;color:#78350f;margin-bottom:0.5rem;">
+                            ${filtered} out of ${total} parts survived filtering.
+                            Try relaxing your constraints (e.g. lower flash/SRAM requirements).
+                        </div>
+                        ${summary ? `<pre style="font-size:0.75rem;background:#fef9c3;padding:0.75rem;border-radius:6px;overflow:auto;max-height:200px;">${summary}</pre>` : ''}
+                    </div>`;
                 return;
+            }
+            // Show ranking explanation banner
+            if (rawData && rawData.ranking_explanation) {
+                const banner = document.createElement('div');
+                banner.style = 'margin-bottom:1rem;padding:0.875rem 1rem;background:#eff6ff;border-left:4px solid #3b82f6;border-radius:0 8px 8px 0;font-size:0.875rem;color:#1e40af;line-height:1.6;';
+                const short = rawData.ranking_explanation.split('\n').slice(0,4).join('\n');
+                banner.innerHTML = `<strong>🤖 LLM Ranking Rationale:</strong><br><pre style="white-space:pre-wrap;font-family:inherit;margin:0.4rem 0 0 0;">${short}</pre>`;
+                container.innerHTML = '';
+                container.appendChild(banner);
+            } else {
+                container.innerHTML = '';
             }
 
             let topId = '';
-            container.innerHTML = candidates.map((c, idx) => {
+            const cardsHtml = candidates.map((c, idx) => {
                 const evidenceHtml = (c.evidence_ids || []).map(eid => `
                     <div style="margin-top:0.5rem; font-size:0.85em;">
                         <a href="/evidence/${eid}/content" target="_blank" style="color:var(--primary);">View Evidence Snippet</a>
@@ -510,6 +555,7 @@
                     ${evidenceHtml ? `<div class="evidence-viewer"><strong>Evidence:</strong>${evidenceHtml}</div>` : ''}
                 </div>
             `}).join('');
+            container.insertAdjacentHTML('beforeend', cardsHtml);
             topCandidateId = topId;
         }
 
@@ -885,7 +931,8 @@
         }
 
         function setLoading(isLoading) {
-            document.body.classList.toggle('loading', isLoading);
+            // No-op: loading is now communicated via setStatusTicker instead of
+            // blocking the entire page body with pointer-events:none.
         }
 
         // --- PIN MUX FUNCTIONS ---

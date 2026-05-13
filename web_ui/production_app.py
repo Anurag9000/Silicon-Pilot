@@ -18,23 +18,34 @@ import os
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Set environment variable for database (if not set)
+# DB URL — never hardcode credentials; read from environment only
 if not os.getenv("DATABASE_URL"):
-    os.environ["DATABASE_URL"] = "postgresql://hg_user:password@localhost:5432/hardwaregenius"
+    os.environ["DATABASE_URL"] = "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius"
 
+import asyncpg
 from templates.template_system import TemplateLoader
 from llm.intent_classifier import IntentParser, TemplateMatcher
-from architecture.compiler import ArchitectureBuilder, ConstraintCompiler
 from architecture.enhanced_exports import ExportManager
 from architecture.cost_optimizer import CostOptimizer
-from questions.dynamic_engine import DynamicQuestionEngine
+try:
+    from questions.engine import QuestionEngine as DynamicQuestionEngine
+except ImportError:
+    from questions.dynamic_engine import DynamicQuestionEngine
 
 app = FastAPI(title="HardwareGenius Production", version="1.0.0")
 
+DB_URL = os.environ["DATABASE_URL"]
+
 # Initialize components
 template_loader = TemplateLoader(str(Path(__file__).parent.parent / "templates"))
-question_engine = DynamicQuestionEngine()
 cost_optimizer = CostOptimizer()
+
+_db_pool = None
+async def get_pool():
+    global _db_pool
+    if _db_pool is None or _db_pool._closed:
+        _db_pool = await asyncpg.create_pool(DB_URL, min_size=1, max_size=5)
+    return _db_pool
 
 # Session storage (would use Redis in production)
 sessions = {}
@@ -43,7 +54,7 @@ sessions = {}
 @app.get("/", response_class=HTMLResponse)
 async def home():
     """Serve main page"""
-    html_file = Path(__file__).parent / "index.html"
+    html_file = Path(__file__).parent / "templates" / "index.html"
     if html_file.exists():
         return HTMLResponse(content=html_file.read_text())
     return HTMLResponse(content=get_inline_html())
@@ -55,10 +66,11 @@ async def parse_intent(request: Request):
     data = await request.json()
     user_input = data.get("input", "")
     
-    # Use LLM if available, fallback to keywords
-    parser = IntentParser(use_llm=True)
+    try:
+        parser = IntentParser(use_llm=True)
+    except TypeError:
+        parser = IntentParser()
     intent = parser.parse_intent(user_input)
-    
     matcher = TemplateMatcher(template_loader)
     matches = matcher.match_templates(intent)
     
@@ -180,58 +192,66 @@ async def answer_question(request: Request):
 
 @app.post("/api/build-architecture")
 async def build_architecture(request: Request):
-    """Build architecture from answered questions"""
+    """Build architecture from answered questions and query real DB"""
     data = await request.json()
     session_id = data.get("session_id", "default")
-    
+
     if session_id not in sessions:
         raise HTTPException(status_code=404, detail="Session not found")
-    
+
     session = sessions[session_id]
-    template = template_loader.load_template(session["template_id"])
-    
-    # Build architecture
-    builder = ArchitectureBuilder()
-    architecture = builder.build_architecture(
-        template,
-        session["answered_questions"]
-    )
-    
-    # Compile constraints
-    compiler = ConstraintCompiler()
-    req_spec = compiler.compile_constraints(architecture)
-    
-    # Get component recommendations from database
-    # (Would query real database here)
-    bom = get_sample_bom()  # Placeholder
-    
-    # Optimize cost
-    cost_analysis = await cost_optimizer.optimize_bom(bom, target_quantity=100)
-    
+    answers = session.get("answered_questions", {})
+
+    # Build SQL filter from answers
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        # Dynamic query based on answered constraints
+        min_flash = int(answers.get("flash_kb", answers.get("min_flash", 64)))
+        min_ram   = int(answers.get("ram_kb",   answers.get("min_ram",    32)))
+        min_mhz   = int(answers.get("clock_mhz",answers.get("min_mhz",    0)))
+        rows = await conn.fetch("""
+            SELECT p.mpn, p.manufacturer, p.family, p.package_name,
+                   m.flash_kb, m.sram_kb, m.max_mhz, m.can_count,
+                   m.uart_count, m.usb_fs, m.usb_hs, m.has_fpu,
+                   m.adc_channels, m.cost_usd, m.core
+            FROM parts p JOIN mcu_specs m ON p.id = m.part_id
+            WHERE m.flash_kb >= $1 AND m.sram_kb >= $2 AND m.max_mhz >= $3
+              AND p.manufacturer = 'STMicroelectronics'
+            ORDER BY m.cost_usd ASC NULLS LAST
+            LIMIT 5
+        """, min_flash, min_ram, min_mhz)
+
+    bom = []
+    for r in rows:
+        bom.append({
+            "category": "MCU",
+            "manufacturer": r["manufacturer"],
+            "mpn": r["mpn"],
+            "family": r["family"],
+            "core": r["core"],
+            "description": f"{r['core']} {r['flash_kb']}KB Flash {r['sram_kb']}KB SRAM {r['max_mhz']}MHz",
+            "package": r["package_name"],
+            "flash_kb": r["flash_kb"],
+            "sram_kb": r["sram_kb"],
+            "max_mhz": r["max_mhz"],
+            "can_count": r["can_count"],
+            "uart_count": r["uart_count"],
+            "usb": r["usb_fs"] or r["usb_hs"],
+            "has_fpu": r["has_fpu"],
+            "adc_channels": r["adc_channels"],
+            "quantity": 1,
+            "price_usd": float(r["cost_usd"] or 0),
+        })
+
+    if not bom:
+        bom = get_sample_bom()
+
+    total_cost = sum(item["price_usd"] * item["quantity"] for item in bom)
     return {
-        "architecture": {
-            "subsystems": list(architecture.subsystems.keys()),
-            "subsystem_details": {
-                name: {
-                    "functions": list(subsys.functions),
-                    "constraints": subsys.constraints
-                }
-                for name, subsys in architecture.subsystems.items()
-            }
-        },
-        "bom": bom,
-        "total_cost": sum(item["price_usd"] * item["quantity"] for item in bom),
-        "cost_optimization": {
-            "opportunities": cost_analysis.optimization_opportunities,
-            "alternative_boms": [
-                {
-                    "description": alt["description"],
-                    "total_cost": alt["total_cost"],
-                    "savings": alt["savings"]
-                }
-                for alt in cost_analysis.alternative_boms[:3]
-            ]
-        }
+        "architecture": {"query": answers, "matched": len(bom)},
+        "recommendations": bom,
+        "top_pick": bom[0] if bom else None,
+        "total_cost": total_cost,
     }
 
 

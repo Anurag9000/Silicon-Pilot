@@ -51,8 +51,10 @@ except ImportError:
     ollama = None
 
 
-DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
-DEFAULT_OLLAMA_MODEL = "qwen3:8b"
+import core.llm_config as _llm_cfg
+DEFAULT_OPENAI_MODEL  = _llm_cfg.LLM_MODEL
+DEFAULT_OLLAMA_MODEL  = _llm_cfg.LLM_MODEL
+OLLAMA_BASE_URL       = _llm_cfg.OLLAMA_BASE_URL
 
 
 @dataclass

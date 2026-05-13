@@ -53,88 +53,113 @@ class RankingFeatures:
 class MLRanker:
     """ML-based ranking engine"""
     
-    def __init__(self, db_url: str):
-        self.db_url = db_url
+    def __init__(self, db_pool):
+        # Accepts either an asyncpg.Pool (preferred) or a URL string (legacy)
+        if isinstance(db_pool, str):
+            import warnings
+            warnings.warn(
+                "MLRanker: pass an asyncpg.Pool, not a URL string.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self._db_url  = db_pool
+            self.db_pool  = None   # created lazily in _get_pool()
+        else:
+            self._db_url  = None
+            self.db_pool  = db_pool
         self.model = None
         self.feature_names = [
-            'flash_kb', 'ram_kb', 'max_freq_mhz', 'peripheral_count',
+            'flash_kb', 'sram_kb', 'max_mhz', 'peripheral_count',
             'manufacturer_popularity', 'spec_completeness',
             'query_match_score', 'cost_score', 'availability_score'
         ]
+
+    async def _get_pool(self):
+        """Return pool, creating one from URL if needed."""
+        if self.db_pool is None:
+            self.db_pool = await asyncpg.create_pool(self._db_url, min_size=1, max_size=5)
+        return self.db_pool
     
     async def extract_features(self, part_id: uuid.UUID,
                               query_text: str = "") -> Optional[RankingFeatures]:
         """Extract features for a part"""
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
-            # Get MCU specs
+        pool = await self._get_pool()
+
+        async with pool.acquire() as conn:
+            # Explicit columns to avoid SELECT p.* collision (both tables have 'id')
             part = await conn.fetchrow("""
-                SELECT p.*, m.flash_kb, m.ram_kb, m.max_freq_mhz,
-                       m.uart_count, m.spi_count, m.i2c_count, m.can_count,
-                       m.usb_count, m.adc_count, m.dac_count, m.timer_count
+                SELECT p.id            AS part_id,
+                       p.mpn,
+                       p.manufacturer,
+                       p.status,
+                       m.flash_kb,
+                       m.sram_kb,
+                       m.max_mhz,
+                       m.uart_count,
+                       m.spi_count,
+                       m.i2c_count,
+                       m.can_count,
+                       m.usb_fs,
+                       m.usb_hs,
+                       m.adc_channels,
+                       m.dac_channels,
+                       m.timers_count,
+                       m.cost_usd
                 FROM parts p
                 LEFT JOIN mcu_specs m ON p.id = m.part_id
                 WHERE p.id = $1
             """, part_id)
-            
+
             if not part:
                 return None
-            
-            # Calculate peripheral count
+
+            # Derive a peripheral count from available columns
             peripheral_count = sum([
-                part['uart_count'] or 0,
-                part['spi_count'] or 0,
-                part['i2c_count'] or 0,
-                part['can_count'] or 0,
-                part['usb_count'] or 0,
-                part['adc_count'] or 0,
-                part['dac_count'] or 0,
-                part['timer_count'] or 0
+                part['uart_count']  or 0,
+                part['spi_count']   or 0,
+                part['i2c_count']   or 0,
+                part['can_count']   or 0,
+                int(bool(part['usb_fs'])) + int(bool(part['usb_hs'])),
+                part['adc_channels'] or 0,
+                part['dac_channels'] or 0,
+                part['timers_count'] or 0,
             ])
-            
-            # Manufacturer popularity (simplified)
+
             manufacturer_popularity = {
                 'STMicroelectronics': 0.9,
                 'NXP': 0.8,
                 'Texas Instruments': 0.85,
                 'Microchip': 0.75,
-                'Analog Devices': 0.8
+                'Analog Devices': 0.8,
             }.get(part['manufacturer'], 0.5)
-            
-            # Spec completeness
-            spec_fields = ['flash_kb', 'ram_kb', 'max_freq_mhz']
+
+            # Spec completeness — only fields we actually store
+            spec_fields = ['flash_kb', 'sram_kb', 'max_mhz']
             filled_fields = sum(1 for f in spec_fields if part[f] is not None)
             spec_completeness = filled_fields / len(spec_fields)
-            
-            # Query match score (simplified - would use TF-IDF in production)
+
             query_match_score = 0.5
             if query_text:
                 query_lower = query_text.lower()
-                mpn_lower = part['mpn'].lower()
-                if mpn_lower in query_lower or query_lower in mpn_lower:
+                if part['mpn'].lower() in query_lower or query_lower in part['mpn'].lower():
                     query_match_score = 1.0
                 elif part['manufacturer'].lower() in query_lower:
                     query_match_score = 0.7
-            
-            # Cost and availability (placeholder - would come from pricing API)
-            cost_score = 0.7
+
+            cost_score        = 0.7
             availability_score = 0.8
-            
+
             return RankingFeatures(
                 flash_kb=float(part['flash_kb'] or 0),
-                ram_kb=float(part['ram_kb'] or 0),
-                max_freq_mhz=float(part['max_freq_mhz'] or 0),
+                ram_kb=float(part['sram_kb'] or 0),
+                max_freq_mhz=float(part['max_mhz'] or 0),
                 peripheral_count=peripheral_count,
                 manufacturer_popularity=manufacturer_popularity,
                 spec_completeness=spec_completeness,
                 query_match_score=query_match_score,
                 cost_score=cost_score,
-                availability_score=availability_score
+                availability_score=availability_score,
             )
-            
-        finally:
-            await conn.close()
     
     def features_to_vector(self, features: RankingFeatures) -> np.ndarray:
         """Convert features to numpy vector"""
@@ -232,18 +257,15 @@ class MLRanker:
                            query_text: str,
                            results_shown: List[uuid.UUID],
                            selected_part_id: uuid.UUID) -> uuid.UUID:
-        """Log user selection for training"""
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
-            # Find selection rank
+        """Log user selection for training (requires user_selections table)."""
+        pool = await self._get_pool()
+        async with pool.acquire() as conn:
             selection_rank = None
-            for i, part_id in enumerate(results_shown, 1):
-                if part_id == selected_part_id:
+            for i, pid in enumerate(results_shown, 1):
+                if pid == selected_part_id:
                     selection_rank = i
                     break
-            
-            # Insert selection
+
             selection_id = await conn.fetchval("""
                 INSERT INTO user_selections (
                     session_id, query_text, query_type,
@@ -254,22 +276,13 @@ class MLRanker:
             """, session_id, query_text, 'search',
                 results_shown, len(results_shown),
                 selected_part_id, selection_rank)
-            
+
             return selection_id
-            
-        finally:
-            await conn.close()
     
     async def get_training_data(self, limit: int = 1000) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Get training data from user selections
-        
-        Returns:
-            (features, labels) where labels are selection ranks
-        """
-        conn = await asyncpg.connect(self.db_url)
-        
-        try:
+        """Get training data from user selections."""
+        pool = await self._get_pool()
+        async with pool.acquire() as conn:
             selections = await conn.fetch("""
                 SELECT selected_part_id, selection_rank, query_text
                 FROM user_selections
@@ -277,37 +290,30 @@ class MLRanker:
                 ORDER BY created_at DESC
                 LIMIT $1
             """, limit)
-            
+
             features_list = []
-            labels_list = []
-            
+            labels_list   = []
+
             for sel in selections:
-                features = await self.extract_features(
+                feats = await self.extract_features(
                     sel['selected_part_id'],
                     sel['query_text'] or ""
                 )
-                
-                if features:
-                    features_list.append(self.features_to_vector(features))
-                    # Convert rank to label (1 = best, higher rank = worse)
-                    # Invert so lower rank = higher label
+                if feats:
+                    features_list.append(self.features_to_vector(feats))
                     label = 1.0 / (sel['selection_rank'] or 1)
                     labels_list.append(label)
-            
+
             if not features_list:
                 return np.array([]), np.array([])
-            
+
             return np.array(features_list), np.array(labels_list)
-            
-        finally:
-            await conn.close()
 
 
 # Example usage
 async def main():
     import os
-    
-    db_url = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+    db_url = os.environ["DATABASE_URL"]
     ranker = MLRanker(db_url)
     
     # Example: Rank parts

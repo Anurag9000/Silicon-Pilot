@@ -1,18 +1,12 @@
 """
-LLM-Enhanced Template Matching
-
-Improves template matching using semantic understanding instead of just keywords.
+LLM-Enhanced Template Matching — provider/model from core/llm_config.py
 """
 
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 import json
 import os
-
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+import core.llm_config as llm_cfg
 
 from templates.template_system import TemplateLoader, DeviceTemplate
 
@@ -50,16 +44,11 @@ class LLMTemplateMatcher:
         self,
         template_loader: TemplateLoader,
         api_key: Optional[str] = None,
-        model: str = "gpt-4"
+        model: str | None = None,
     ):
         self.loader = template_loader
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.model = model
-        
-        if OpenAI and self.api_key:
-            self.client = OpenAI(api_key=self.api_key)
-        else:
-            self.client = None
+        self.model = model or llm_cfg.MODEL_PARSER
+        self.client = llm_cfg.get_openai_client()
     
     def match_templates(
         self,

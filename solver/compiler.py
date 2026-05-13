@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 class ConstraintCompiler:
     """Compile requirements into SQL queries"""
+
+    # Fields where a small fuzzy tolerance (2%) is acceptable
+    CONTINUOUS_FIELDS: set = {'m.flash_kb', 'm.sram_kb', 'm.max_mhz', 'm.cost_usd'}
     
     def compile(self, spec: RequirementSpec) -> Tuple[str, List[Any]]:
         """
@@ -57,13 +60,17 @@ class ConstraintCompiler:
         # Compile interface requirements
         if spec.interfaces:
             for peripheral, min_count in spec.interfaces.items():
-                field_name = f"{peripheral}_count"
+                # Normalise: if user already sent 'can_count', don't double-suffix it
+                if peripheral.endswith('_count'):
+                    field_name = peripheral
+                else:
+                    field_name = f"{peripheral}_count"
                 clause, field_params, param_counter = self._compile_constraint(
                     field_name,
                     {"min": min_count},
                     param_counter,
                 )
-                
+
                 if clause:
                     where_clauses.append(clause)
                     params.extend(field_params)
@@ -161,14 +168,16 @@ class ConstraintCompiler:
             clauses = []
             
             if "min" in constraint_value:
-                # FUZZY ENGINEERING: Apply a 2% margin to minimum requirements
-                # This ensures a 2000KB chip satisfies a 2048KB request, as engineers allow for small variances.
                 raw_val = constraint_value["min"]
                 try: 
                     num_val = float(raw_val)
-                    fuzzy_min = num_val * 0.98 # 2% tolerance
-                    clauses.append(f"CAST({db_field} AS NUMERIC) >= ${param_counter}")
-                    params.append(fuzzy_min)
+                    if db_field in self.CONTINUOUS_FIELDS:
+                        fuzzy_min = num_val * 0.98
+                        clauses.append(f"CAST({db_field} AS NUMERIC) >= ${param_counter}")
+                        params.append(fuzzy_min)
+                    else:
+                        clauses.append(f"CAST({db_field} AS NUMERIC) >= ${param_counter}")
+                        params.append(num_val)
                 except:
                     clauses.append(f"CAST({db_field} AS NUMERIC) >= ${param_counter}")
                     params.append(raw_val)

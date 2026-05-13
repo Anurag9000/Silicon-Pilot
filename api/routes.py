@@ -22,6 +22,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import asyncpg
+
 from solver.alternative_suggester import AlternativeSuggester, AlternativeType
 from solver.design_rule_checker import DesignRuleChecker
 from solver.pin_mux_solver import PinMuxSolver, PinRequirement, PinType
@@ -30,8 +32,25 @@ from architecture.firmware_stack_recommender import FirmwareStackRecommender, St
 from architecture.reference_design_matcher import ReferenceDesignMatcher
 from ml.ranker import MLRanker
 
-# Database URL
-DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:1Anurag2Basistha@localhost:5432/hardwaregenius")
+# Database URL — read from environment; never hard-code credentials here.
+DB_URL = os.environ["DATABASE_URL"]
+
+# ---------------------------------------------------------------------------
+# Shared connection pool — created lazily on first request.
+# In production this is initialised once in server.py lifespan and injected
+# as app.state.db_pool; here we fall back to creating it on demand so that
+# the router can also be used standalone (e.g. in tests).
+# ---------------------------------------------------------------------------
+_pool: Optional[asyncpg.Pool] = None
+
+
+async def get_pool() -> asyncpg.Pool:
+    """Return (or lazily create) the shared asyncpg pool."""
+    global _pool
+    if _pool is None or _pool._closed:  # type: ignore[attr-defined]
+        _pool = await asyncpg.create_pool(DB_URL, min_size=1, max_size=10)
+    return _pool
+
 
 # Create router
 router = APIRouter(prefix="/api/v1", tags=["HardwareGenius API"])
@@ -200,52 +219,49 @@ async def search_components(request: SearchRequest):
     Uses ML-based ranking with hybrid scoring (70% deterministic + 30% ML)
     """
     try:
-        import asyncpg
-        
-        conn = await asyncpg.connect(DB_URL)
-        
-        try:
-            # Search parts by query
+        pool = await get_pool()
+
+        async with pool.acquire() as conn:
+            # Correct column names: sram_kb (not ram_kb), max_mhz (not max_freq_mhz)
+            # parts table has no 'category' column — use family as a proxy label
             parts = await conn.fetch("""
-                SELECT p.id, p.mpn, p.manufacturer, p.category,
-                       m.flash_kb, m.ram_kb, m.max_freq_mhz
+                SELECT p.id, p.mpn, p.manufacturer, p.family,
+                       m.flash_kb, m.sram_kb, m.max_mhz
                 FROM parts p
                 LEFT JOIN mcu_specs m ON p.id = m.part_id
-                WHERE p.category = $1
-                  AND (p.mpn ILIKE $2 OR p.manufacturer ILIKE $2)
-                LIMIT $3
-            """, request.category, f"%{request.query}%", request.limit * 2)
-            
+                WHERE (p.mpn ILIKE $1 OR p.manufacturer ILIKE $1 OR p.family ILIKE $1)
+                LIMIT $2
+            """, f"%{request.query}%", request.limit * 2)
+
             if not parts:
                 return SearchResponse(results=[], total=0)
-            
-            # Rank using ML ranker
-            ranker = MLRanker(DB_URL)
-            part_ids = [p['id'] for p in parts]
+
+            # Rank using ML ranker (receives pool, not URL string)
+            ranker = MLRanker(pool)
+            part_ids = [p["id"] for p in parts]
             ranked = await ranker.rank_parts(part_ids, request.query)
-            
+
             # Build results
             results = []
-            for part_id, score in ranked[:request.limit]:
-                part = next(p for p in parts if p['id'] == part_id)
-                results.append(PartResult(
-                    id=str(part['id']),
-                    mpn=part['mpn'],
-                    manufacturer=part['manufacturer'],
-                    category=part['category'],
-                    specs={
-                        'flash_kb': part['flash_kb'],
-                        'ram_kb': part['ram_kb'],
-                        'max_freq_mhz': part['max_freq_mhz']
-                    },
-                    score=score
-                ))
-            
+            for part_id, score in ranked[: request.limit]:
+                part = next(p for p in parts if p["id"] == part_id)
+                results.append(
+                    PartResult(
+                        id=str(part["id"]),
+                        mpn=part["mpn"],
+                        manufacturer=part["manufacturer"],
+                        category=part["family"] or request.category,
+                        specs={
+                            "flash_kb":  part["flash_kb"],
+                            "sram_kb":   part["sram_kb"],
+                            "max_mhz":   part["max_mhz"],
+                        },
+                        score=score,
+                    )
+                )
+
             return SearchResponse(results=results, total=len(ranked))
-            
-        finally:
-            await conn.close()
-            
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -256,18 +272,19 @@ async def get_alternatives(part_id: str, max_results: int = 5, type: Optional[st
     Find alternative parts (pin-compatible, functionally equivalent, cost-optimized)
     """
     try:
-        suggester = AlternativeSuggester(DB_URL)
-        
-        # Convert type filter
-        alt_type = None
-        if type:
-            alt_type = AlternativeType(type)
-        
+        pool = await get_pool()
+        suggester = AlternativeSuggester(pool)
+
+        # find_alternatives() does not accept alternative_type — filter post-fetch
         alternatives = await suggester.find_alternatives(
             UUID(part_id),
-            max_results=max_results,
-            alternative_type=alt_type
+            max_results=max_results * 3 if type else max_results,
         )
+
+        # Apply type filter client-side if requested
+        if type:
+            alt_type = AlternativeType(type)
+            alternatives = [a for a in alternatives if a.alternative_type == alt_type][:max_results]
         
         results = []
         for alt in alternatives:
@@ -293,23 +310,44 @@ async def check_design(request: DesignCheckRequest):
     Validate design against 50+ rules
     """
     try:
-        checker = DesignRuleChecker(DB_URL)
-        
-        # Run checks (simplified - would need actual part data)
-        violations = []
-        
-        # This is a placeholder - full implementation would check all rules
+        pool = await get_pool()
+        checker = DesignRuleChecker(pool)
+
+        design_uuids = [UUID(pid) for pid in request.design_parts]
+        pmic_uuid    = UUID(request.pmic_id) if request.pmic_id else None
+
+        raw_violations = await checker.check_design(
+            design_parts=design_uuids,
+            pmic_id=pmic_uuid,
+            required_flash_kb=request.required_flash_kb,
+            required_ram_kb=request.required_ram_kb,
+            target_freq_mhz=request.target_freq_mhz,
+            ambient_temp_c=request.ambient_temp_c,
+        )
+
+        violations = [
+            ViolationResult(
+                rule_id=v.rule_id,
+                rule_name=v.rule_name,
+                severity=v.severity,
+                component=getattr(v, "component", None),
+                message=v.message,
+                recommendation=getattr(v, "recommendation", None),
+            )
+            for v in raw_violations
+        ]
+
         summary = {
-            "total": 0,
-            "errors": 0,
-            "warnings": 0,
-            "info": 0
+            "total":    len(violations),
+            "errors":   sum(1 for v in violations if v.severity == "error"),
+            "warnings": sum(1 for v in violations if v.severity == "warning"),
+            "info":     sum(1 for v in violations if v.severity == "info"),
         }
-        
+
         return DesignCheckResponse(
-            success=len(violations) == 0,
+            success=summary["errors"] == 0,
             summary=summary,
-            violations=violations
+            violations=violations,
         )
         
     except Exception as e:
@@ -322,7 +360,8 @@ async def solve_pinmux(request: PinMuxRequest):
     Solve pin assignment conflicts
     """
     try:
-        solver = PinMuxSolver(DB_URL)
+        pool = await get_pool()
+        solver = PinMuxSolver(pool)
         
         # Convert requirements
         requirements = []
@@ -362,7 +401,8 @@ async def calculate_power(request: PowerCalculateRequest):
     Calculate system power consumption and battery life
     """
     try:
-        calculator = PowerBudgetCalculator(DB_URL)
+        pool = await get_pool()
+        calculator = PowerBudgetCalculator(pool)
         
         # Convert mode profiles
         mode_profiles = []
@@ -437,7 +477,8 @@ async def recommend_firmware(request: FirmwareRecommendRequest):
     Recommend RTOS, middleware, and libraries
     """
     try:
-        recommender = FirmwareStackRecommender(DB_URL)
+        pool = await get_pool()
+        recommender = FirmwareStackRecommender(pool)
         
         # Convert requirements
         requirements = []
@@ -490,7 +531,8 @@ async def search_reference_designs(
     Find reference designs
     """
     try:
-        matcher = ReferenceDesignMatcher(DB_URL)
+        pool = await get_pool()
+        matcher = ReferenceDesignMatcher(pool)
         
         # Search by MCU if provided
         if mcu_id:

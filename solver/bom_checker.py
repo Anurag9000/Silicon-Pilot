@@ -151,8 +151,20 @@ class BOMCompatibilityChecker:
 
         for mcu in mcus:
             mcu_mpn = str(mcu.get("mpn") or "MCU")
-            # Most ARM Cortex-M MCUs operate at 3.3V or 1.8V — infer from family
-            expected_v = 3.3  # Default assumption
+
+            # Determine the MCU's acceptable supply voltage range from spec data.
+            # Prefer vdd_min_v / vdd_max_v stored in mcu_specs.  Fall back to
+            # common values (1.8 V and 3.3 V) when spec data is missing.
+            vdd_min = self._safe_float(mcu.get("vdd_min_v")) or self._safe_float(mcu.get("voltage_min_v"))
+            vdd_max = self._safe_float(mcu.get("vdd_max_v")) or self._safe_float(mcu.get("voltage_max_v"))
+
+            if vdd_min is None or vdd_max is None:
+                # No spec data — accept both 1.8 V and 3.3 V as "expected"
+                accepted_voltages = [1.8, 3.3]
+                expected_v = 3.3  # display label only
+            else:
+                accepted_voltages = None   # use range check below
+                expected_v = (vdd_min + vdd_max) / 2
 
             for reg in regulators:
                 reg_mpn = str(reg.get("mpn") or "REG")
@@ -165,9 +177,17 @@ class BOMCompatibilityChecker:
                         severity=CheckSeverity.WARNING,
                         parts_involved=[mcu_mpn, reg_mpn],
                         message=f"{reg_mpn}: output voltage not specified in datasheet data.",
-                        recommendation=f"Verify {reg_mpn} supplies ~{expected_v}V for {mcu_mpn}.",
+                        recommendation=f"Verify {reg_mpn} supplies {vdd_min or 1.8}–{vdd_max or 3.3}V for {mcu_mpn}.",
                     ))
-                elif abs(vout - expected_v) < 0.15:
+                    continue
+
+                # Voltage compatibility check
+                if accepted_voltages is not None:
+                    compatible = any(abs(vout - v) < 0.15 for v in accepted_voltages)
+                else:
+                    compatible = (vdd_min - 0.1) <= vout <= (vdd_max + 0.1)
+
+                if compatible:
                     report.passed.append(CompatibilityIssue(
                         check_name="Voltage Level Compatibility",
                         severity=CheckSeverity.PASS,

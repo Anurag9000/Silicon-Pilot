@@ -1,0 +1,24 @@
+INFO:     Started server process [7303]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60668 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60668 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60672 - "POST /spec/from_text HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51144 - "POST /admin/ingest?mode=mock HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51144 - "GET /api/ingest/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:51998 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52002 - "POST /spec/from_text HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53566 - "POST /admin/ingest?mode=production HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53566 - "GET /api/ingest/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57646 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:57652 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48836 - "POST /spec/from_text HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:46886 - "POST /admin/ingest?mode=mock HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:46886 - "GET /api/ingest/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:37854 - "POST /spec/from_text HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52010 - "GET /static/main.js HTTP/1.1" 404 Not Found
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [7303]

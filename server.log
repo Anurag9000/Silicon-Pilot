@@ -1,0 +1,248 @@
+INFO:     Started server process [7302]
+INFO:     Waiting for application startup.
+INFO:server:Starting HardwareGenius Unified Server
+INFO:core.database:Creating database connection pool
+INFO:core.database:Database connection pool created
+INFO:server:Initializing universal hardware data...
+INFO:server:Universal sync complete: Mock and Production DBs are primed.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+┌─────────────────────────────────────────────┐
+│         Silicon-Pilot LLM Config            │
+├─────────────────────────────────────────────┤
+│  Provider : ollama                          │
+│  Model    : qwen2.5:0.5b                    │
+│  Base URL : http://localhost:11434          │
+│  Temp     : 0.1                             │
+│  MaxTokens: 2048                            │
+│  Timeout  : 300.0s                             │
+├─────────────────────────────────────────────┤
+│  parser   : qwen2.5:1.5b                    │
+│  ranker   : qwen2.5:1.5b                    │
+│  debate   : qwen2.5:7b                      │
+│  review   : qwen2.5:7b                      │
+│  ingestion: qwen2.5:1.5b                    │
+└─────────────────────────────────────────────┘
+INFO:     127.0.0.1:55722 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53432 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53432 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53440 - "GET / HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/Projects/ToFix/Silicon-Pilot/server.py", line 119, in serve_index
+    return templates.TemplateResponse("index.html", {"request": request})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/templating.py", line 148, in TemplateResponse
+    template = self.get_template(name)
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/templating.py", line 115, in get_template
+    return self.env.get_template(name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/environment.py", line 1010, in get_template
+    return self._load_template(name, globals)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/environment.py", line 958, in _load_template
+    template = self.cache.get(cache_key)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/utils.py", line 469, in get
+    return self[key]
+           ~~~~^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/utils.py", line 507, in __getitem__
+    rv = self._mapping[key]
+         ~~~~~~~~~~~~~^^^^^
+TypeError: unhashable type: 'dict'
+INFO:     127.0.0.1:35762 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35762 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35772 - "GET / HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/Projects/ToFix/Silicon-Pilot/server.py", line 119, in serve_index
+    return templates.TemplateResponse("index.html", {"request": request})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/templating.py", line 148, in TemplateResponse
+    template = self.get_template(name)
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/templating.py", line 115, in get_template
+    return self.env.get_template(name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/environment.py", line 1010, in get_template
+    return self._load_template(name, globals)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/environment.py", line 958, in _load_template
+    template = self.cache.get(cache_key)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/utils.py", line 469, in get
+    return self[key]
+           ~~~~^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/utils.py", line 507, in __getitem__
+    rv = self._mapping[key]
+         ~~~~~~~~~~~~~^^^^^
+TypeError: unhashable type: 'dict'
+INFO:     127.0.0.1:43264 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43264 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:llm.orchestrator:Parsing requirements with LLM
+INFO:     127.0.0.1:51374 - "GET / HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 421, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 56, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/applications.py", line 1159, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/applications.py", line 90, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 660, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 680, in app
+    await route.handle(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/routing.py", line 276, in handle
+    await self.app(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 134, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 120, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 674, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/fastapi/routing.py", line 328, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/Projects/ToFix/Silicon-Pilot/server.py", line 119, in serve_index
+    return templates.TemplateResponse("index.html", {"request": request})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/templating.py", line 148, in TemplateResponse
+    template = self.get_template(name)
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/anurag-basistha/.local/lib/python3.12/site-packages/starlette/templating.py", line 115, in get_template
+    return self.env.get_template(name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/environment.py", line 1010, in get_template
+    return self._load_template(name, globals)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/environment.py", line 958, in _load_template
+    template = self.cache.get(cache_key)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/utils.py", line 469, in get
+    return self[key]
+           ~~~~^^^^^
+  File "/usr/lib/python3/dist-packages/jinja2/utils.py", line 507, in __getitem__
+    rv = self._mapping[key]
+         ~~~~~~~~~~~~~^^^^^
+TypeError: unhashable type: 'dict'
+INFO:httpx:HTTP Request: POST http://localhost:11434/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:llm.orchestrator:Parsed spec with 0 unknowns
+INFO:solver.hard_filter:Applying hard filter for component_type: mcu
+WARNING:solver.compiler:Unknown field: component_type
+INFO:solver.hard_filter:Hard filter: 148 candidates found
+INFO:     127.0.0.1:43274 - "POST /spec/from_text HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:core.database:Database connection pool closed
+INFO:     Application shutdown complete.
+INFO:     Finished server process [7302]

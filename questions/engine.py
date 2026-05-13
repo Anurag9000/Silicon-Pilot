@@ -85,31 +85,34 @@ class QuestionEngine:
         gains = {}
         
         for field in unknown_fields:
-            # Get distribution of values for this field
             value_counts = defaultdict(int)
-            
+
             for candidate in candidates:
                 value = candidate.get(field)
                 if value is not None:
                     value_counts[value] += 1
-            
+
             if not value_counts:
                 gains[field] = 0.0
                 continue
-            
-            # Calculate entropy (higher entropy = more information gain)
+
+            # Shannon entropy: H = -Σ p * log2(p)
+            # Higher entropy → this field has more variance → asking about it narrows
+            # the candidate set the most.
+            import math
             total = len(candidates)
             entropy = 0.0
-            
+
             for count in value_counts.values():
                 p = count / total
                 if p > 0:
-                    entropy -= p * (p ** 0.5)  # Simplified entropy
-            
-            # Normalize by number of unique values
-            unique_values = len(value_counts)
+                    entropy -= p * math.log2(p)
+
+            # Weight by number of unique values so fields with many distinct
+            # values (e.g. exact MHz) rank above binary flags.
+            unique_values  = len(value_counts)
             normalized_gain = entropy * unique_values
-            
+
             gains[field] = normalized_gain
         
         return gains
@@ -231,8 +234,11 @@ class QuestionEngine:
         """
         logger.info(f"Applying {len(answers)} answers")
         
-        # Create a copy
-        updated_spec = spec.model_copy(deep=True)
+        # Pydantic v2 uses model_copy(); v1 uses copy() — support both
+        try:
+            updated_spec = spec.model_copy(deep=True)
+        except AttributeError:
+            updated_spec = spec.copy(deep=True)
         
         for answer in answers:
             field_name = answer.field_name

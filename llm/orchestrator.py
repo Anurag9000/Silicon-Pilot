@@ -1,35 +1,35 @@
 """
 LLM Orchestrator
 
-OpenAI integration for parsing requirements and generating responses
-with strict evidence-required enforcement.
+All model/provider config is read from core.llm_config — change one file to
+switch the entire repo between Ollama, OpenAI, or any other provider.
 """
 from __future__ import annotations
 import logging
 import json
 from typing import Dict, List, Any, Optional
-import openai
-from openai import AsyncOpenAI
 
 from core.models import RequirementSpec, Question, QuestionTier
+import core.llm_config as llm_cfg
 
 logger = logging.getLogger(__name__)
 
 
 class LLMOrchestrator:
-    """LLM orchestration with OpenAI"""
-    
-    def __init__(self, api_key: str, base_url: Optional[str] = None, model: str = "gpt-4o"):
+    """LLM orchestration — provider determined by core/llm_config.py"""
+
+    def __init__(self,
+                 api_key: str | None = None,
+                 base_url: str | None = None,
+                 model: str | None = None):
         """
-        Initialize LLM orchestrator.
+        Construct orchestrator.  All three args are optional and fall back to
+        the values in core/llm_config.py so callers can use LLMOrchestrator()
+        with zero arguments and it will use Ollama automatically.
         """
         import httpx
-        self.client = AsyncOpenAI(
-            api_key=api_key, 
-            base_url=base_url,
-            timeout=httpx.Timeout(300.0, connect=10.0)
-        )
-        self.model = model
+        self.model = model or llm_cfg.MODEL_RANKER
+        self.client = llm_cfg.get_async_openai_client()
     
     async def parse_requirements(
         self,
@@ -49,17 +49,26 @@ class LLMOrchestrator:
         system_prompt = """You are a world-class Senior Systems Architect and Hardware Engineer.
 Your task is to extract structured engineering constraints from user natural language.
 
-ENGINEERING PHILOSOPHY:
-1. INFER REQUIREMENTS: If a user mentions a complex task (e.g., "Computer Vision", "Real-time ML", "Motor FOC control"), you must naturally infer the minimum viable hardware specs. 
-   - Vision/ML needs: High Flash (min 2048), High RAM (min 1024), and DSP/FPU capable cores (Cortex-M7).
-2. UNIT PRECISION: You MUST output raw integers for values. Do not write "KB" or "MHz".
+ENGINEERING PHILOSOPHY & EXHAUSTIVE PARSING:
+1. EXHAUSTIVE SPEC MATCHING: You must explicitly infer and output constraints for EVERY relevant column in the database (e.g. max_mhz, flash_kb, sram_kb, can_count, can_fd_count, usb_fs, usb_hs, uart_count, spi_count, i2c_count, adc_count, dac_count, ethernet_count, timers_count, pwm_channels, has_fpu, has_dsp, has_crypto, has_wireless, voltage_min_v, voltage_max_v) even if only implicitly hinted at by the user.
+2. INFER IMPLICIT REQUIREMENTS: If a user mentions a complex task (e.g., "Computer Vision", "Real-time ML", "Motor FOC control", "Drone Flight Controller", "Battery Powered IoT"), you MUST naturally infer the minimum viable hardware specs across ALL columns.
+   - Vision/ML needs: High Flash (min 2048), High RAM (min 1024), DSP/FPU (has_dsp: 1, has_fpu: 1), High MHz (min 400).
+   - Drone Flight Controller needs: Timers/PWM (min 12), UARTs (min 4 for GPS/Telem), I2C (min 2 for IMU), FPU (has_fpu: 1 for math).
+   - Battery/IoT needs: Low Vmin (1.8V), maybe wireless.
+3. UNIT PRECISION: You MUST output raw integers for values. Do not write "KB" or "MHz". Boolean specs (has_fpu, has_dsp) should be output as 1.
 
 CRITICAL RULES FOR JSON KEYS:
-You MUST use these EXACT keys for hard_constraints:
+You MUST use these EXACT keys for hard_constraints based on the database schema:
 - "flash_kb": {"min": integer}
 - "sram_kb": {"min": integer}
+- "max_mhz": {"min": integer}
 - "core": string
-- "can_count": {"min": integer}
+- "uart_count": {"min": integer}
+- "spi_count": {"min": integer}
+- "i2c_count": {"min": integer}
+- "adc_count": {"min": integer}
+- "has_fpu": {"min": integer}
+- "has_dsp": {"min": integer}
 
 Output a JSON object EXACTLY like this example:
 {
@@ -67,8 +76,8 @@ Output a JSON object EXACTLY like this example:
   "hard_constraints": {
     "flash_kb": {"min": 2048},
     "sram_kb": {"min": 1024},
-    "core": "ARM Cortex-M7",
-    "can_count": {"min": 2}
+    "has_dsp": {"min": 1},
+    "uart_count": {"min": 4}
   },
   "soft_preferences": {},
   "environment": {},
@@ -98,6 +107,32 @@ Output a JSON object EXACTLY like this example:
         hard_constraints = parsed.get('hard_constraints', {})
         if 'component_type' in parsed:
             hard_constraints['component_type'] = parsed['component_type']
+
+        def _coerce_int_dict(d: dict) -> dict:
+            """
+            Flatten LLM outputs where values are {"min": N}, {"count": N},
+            {"value": N} or {"required": N} instead of plain ints.
+            RequirementSpec.interfaces is Dict[str, int].
+            """
+            out = {}
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    # Try all common LLM key variants in priority order
+                    for key in ('min', 'count', 'value', 'required', 'max'):
+                        if key in v and isinstance(v[key], (int, float)):
+                            out[k] = int(v[key])
+                            break
+                    else:
+                        # Fallback: first numeric value
+                        num = next((x for x in v.values() if isinstance(x, (int, float))), None)
+                        if num is not None:
+                            out[k] = int(num)
+                elif isinstance(v, (int, float)):
+                    out[k] = int(v)
+                elif isinstance(v, str) and v.isdigit():
+                    out[k] = int(v)
+                # skip non-numeric entries silently
+            return out
         
         # Build RequirementSpec
         # Ensure assumptions is a dict (LLMs sometimes return a list)
@@ -107,11 +142,14 @@ Output a JSON object EXACTLY like this example:
         else:
             assumptions = assumptions_raw
 
+        raw_interfaces = parsed.get('interfaces', {})
+        interfaces = _coerce_int_dict(raw_interfaces) if isinstance(raw_interfaces, dict) else {}
+
         spec = RequirementSpec(
             hard_constraints=hard_constraints,
-            soft_preferences=parsed.get('soft_preferences', {}),
+            soft_preferences=_coerce_int_dict(parsed.get('soft_preferences', {})),
             environment=parsed.get('environment', {}),
-            interfaces=parsed.get('interfaces', {}),
+            interfaces=interfaces,
             unknowns=parsed.get('unknowns', []),
             assumptions=assumptions,
         )

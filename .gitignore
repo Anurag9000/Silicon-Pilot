@@ -49,3 +49,8 @@ server_output.log
 __pycache__/
 .pytest_cache/
 
+# Database (allow dumps, ignore SQLite)
+*.db
+*.sqlite3
+# Allow PostgreSQL dumps for demo deployment
+!database/dumps/*.sql
