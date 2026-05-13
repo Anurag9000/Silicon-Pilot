@@ -230,34 +230,49 @@
 
     <!-- PIN MUX SECTION -->
     <div class="card">
-        <h2>Pin Mux Solver</h2>
+        <h2>📌 Pin Mux Solver</h2>
+        <p style="color:#64748b;font-size:0.9rem;margin-top:0;">
+            Check peripheral availability for the selected MCU. Works for all 461 parts using real MCU specs.
+            Click any result card above to auto-fill the Part ID.
+        </p>
         <div class="grid">
             <div>
-                <label for="pm-part-id">Part ID (from Search)</label>
-                <input type="text" id="pm-part-id" placeholder="UUID..."
-                    style="width: 100%; padding: 0.5rem; margin-bottom: 1rem;">
+                <label for="pm-part-id">Part ID <small style="color:#94a3b8">(auto-filled on card click)</small></label>
+                <input type="text" id="pm-part-id" placeholder="Click a result card or paste UUID…"
+                    style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; border:1px solid #cbd5e1; border-radius:6px; font-size:0.85rem;">
 
-                <h3>Requirements</h3>
+                <h3 style="margin-bottom:0.5rem;">🔧 Required Peripherals</h3>
+                <p style="font-size:0.8rem;color:#94a3b8;margin-top:0;">Select type + enter a specific signal name (e.g. USART1_TX) or leave blank to just count instances.</p>
                 <div id="pm-reqs">
-                    <div class="req-row" style="margin-bottom: 0.5rem;">
-                        <select class="req-type">
-                            <option value="uart">UART</option>
+                    <div class="req-row" style="display:flex;gap:0.5rem;margin-bottom:0.5rem;align-items:center;">
+                        <select class="req-type" style="padding:0.4rem;border:1px solid #cbd5e1;border-radius:6px;">
+                            <option value="uart">UART/USART</option>
                             <option value="spi">SPI</option>
                             <option value="i2c">I2C</option>
+                            <option value="can">CAN / CAN-FD</option>
                             <option value="adc">ADC</option>
+                            <option value="dac">DAC</option>
+                            <option value="pwm">PWM</option>
+                            <option value="usb">USB</option>
+                            <option value="timer">Timer</option>
+                            <option value="ethernet">Ethernet</option>
+                            <option value="gpio">GPIO</option>
                         </select>
-                        <input type="text" class="req-name" placeholder="Name (e.g. USART1_TX)">
+                        <input type="text" class="req-name" placeholder="Signal name (optional, e.g. USART1_TX)"
+                            style="flex:1;padding:0.4rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.85rem;">
+                        <button onclick="this.parentElement.remove()" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:0.3rem 0.6rem;cursor:pointer;">✕</button>
                     </div>
                 </div>
-                <button onclick="addReqRow()">+ Add Requirement</button>
-                <br><br>
-                <button onclick="solvePinMux()">Solve Pin Mux</button>
+                <button onclick="addReqRow()" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;padding:0.4rem 1rem;cursor:pointer;margin-bottom:0.75rem;">+ Add Peripheral</button>
+                <br>
+                <button onclick="solvePinMux()" style="background:linear-gradient(135deg,#2563eb,#7c3aed);color:white;border:none;border-radius:8px;padding:0.6rem 1.5rem;cursor:pointer;font-weight:600;font-size:0.95rem;">📌 Check Peripheral Availability</button>
             </div>
 
             <div>
-                <h3>Results</h3>
-                <pre id="pm-results"
-                    style="background: #f1f5f9; padding: 1rem; border-radius: 8px; overflow: auto; max-height: 400px;">No solution yet.</pre>
+                <h3 style="margin-bottom:0.5rem;">Results</h3>
+                <div id="pm-results" style="background:#f8fafc;padding:1rem;border-radius:8px;min-height:120px;font-size:0.9rem;">
+                    <span style="color:#94a3b8;">Select a part card and add requirements, then click Check.</span>
+                </div>
             </div>
         </div>
     </div>
@@ -520,7 +535,11 @@
                 const partId = c.part ? c.part.id : '';
                 const mpn = c.part ? c.part.mpn : (c.mpn || 'Unknown');
                 const ram = c.specs.sram_kb || c.specs.ram_kb || '—';
-                const can = c.specs.can_count != null ? c.specs.can_count : '—';
+                // Show total CAN = classic CAN + CAN-FD
+                const canClassic = c.specs.can_count || 0;
+                const canFD = c.specs.can_fd_count || 0;
+                const canTotal = canClassic + canFD;
+                const canLabel = canTotal > 0 ? `${canTotal}${canFD > 0 ? ' (FD)' : ''}` : '0';
                 const mhz = c.specs.max_mhz || '—';
                 const flash = c.specs.flash_kb || '—';
                 const scorePercent = (c.total_score * 100).toFixed(0);
@@ -541,7 +560,7 @@
                         <div>⚡ ${mhz}MHz</div>
                         <div>💾 Flash: ${flash}KB</div>
                         <div>🧠 RAM: ${ram}KB</div>
-                        <div>🔌 CAN×${can}</div>
+                        <div>🔌 CAN×${canLabel}</div>
                         <div>💰 ${cost}</div>
                         <div>${c.specs.has_fpu ? '✅ FPU' : '❌ FPU'}</div>
                     </div>
@@ -939,38 +958,43 @@
         function addReqRow() {
             const div = document.createElement('div');
             div.className = 'req-row';
-            div.style.marginBottom = '0.5rem';
+            div.style.cssText = 'display:flex;gap:0.5rem;margin-bottom:0.5rem;align-items:center;';
             div.innerHTML = `
-                <select class="req-type">
-                    <option value="uart">UART</option>
+                <select class="req-type" style="padding:0.4rem;border:1px solid #cbd5e1;border-radius:6px;">
+                    <option value="uart">UART/USART</option>
                     <option value="spi">SPI</option>
                     <option value="i2c">I2C</option>
+                    <option value="can">CAN / CAN-FD</option>
                     <option value="adc">ADC</option>
+                    <option value="dac">DAC</option>
+                    <option value="pwm">PWM</option>
+                    <option value="usb">USB</option>
+                    <option value="timer">Timer</option>
+                    <option value="ethernet">Ethernet</option>
+                    <option value="gpio">GPIO</option>
                 </select>
-                <input type="text" class="req-name" placeholder="Name (e.g. USART1_TX)">
+                <input type="text" class="req-name" placeholder="Signal name (optional)"
+                    style="flex:1;padding:0.4rem;border:1px solid #cbd5e1;border-radius:6px;font-size:0.85rem;">
+                <button onclick="this.parentElement.remove()" style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;border-radius:6px;padding:0.3rem 0.6rem;cursor:pointer;">✕</button>
             `;
             document.getElementById('pm-reqs').appendChild(div);
         }
 
         async function solvePinMux() {
-            const partId = document.getElementById('pm-part-id').value;
-            if (!partId) return alert("Enter Part ID");
+            const partId = document.getElementById('pm-part-id').value.trim();
+            if (!partId) return alert("Please click a result card first to select an MCU, or paste its Part ID.");
 
             const reqs = [];
             document.querySelectorAll('.req-row').forEach(row => {
                 const type = row.querySelector('.req-type').value;
-                const name = row.querySelector('.req-name').value;
-                if (name) {
-                    reqs.push({
-                        function_type: type,
-                        function_name: name,
-                        required: true
-                    });
-                }
+                const name = (row.querySelector('.req-name').value || '').trim();
+                reqs.push({ function_type: type, function_name: name, required: true });
             });
 
+            if (reqs.length === 0) return alert('Add at least one peripheral requirement.');
+
             const res = document.getElementById('pm-results');
-            res.innerHTML = '<em>Solving constraints…</em>';
+            res.innerHTML = '<em style="color:#64748b;">⏳ Checking peripheral availability…</em>';
 
             try {
                 const response = await fetch(`/api/parts/${partId}/solve`, {
@@ -979,28 +1003,67 @@
                     body: JSON.stringify(reqs)
                 });
 
-                const data = await response.json();
-                if (data.error) {
-                    res.innerHTML = `<span style='color:red'>❌ Error: ${data.error}</span>`;
+                if (!response.ok) {
+                    const err = await response.json();
+                    res.innerHTML = `<span style='color:red'>❌ Error: ${err.detail || response.status}</span>`;
                     return;
                 }
-                const status = data.success
-                    ? `<span style='color:green;font-weight:700'>✅ All constraints satisfied!</span>`
-                    : `<span style='color:orange;font-weight:700'>⚠️ Partial solution — some requirements unassigned</span>`;
-                const assignments = Object.entries(data.assignments || {}).map(([fn, asgn]) =>
-                    `<tr><td style='padding:0.25rem 0.5rem'>${fn}</td><td style='padding:0.25rem 0.5rem;font-weight:600'>${asgn.pin_name}</td><td style='padding:0.25rem 0.5rem'>AF${asgn.alternate_function}</td></tr>`
-                ).join('');
-                const unassigned = (data.unassigned || []).map(u => `<li style='color:red'>${u}</li>`).join('');
+
+                const data = await response.json();
+
+                // Build capacity table
+                const cap = data.peripheral_capacity || {};
+                const capRows = Object.entries(cap).filter(([,v]) => v > 0)
+                    .map(([k,v]) => `<tr><td style='padding:0.2rem 0.5rem;text-transform:uppercase;font-size:0.8rem;color:#475569'>${k}</td><td style='padding:0.2rem 0.5rem;font-weight:700;color:#1e293b'>${v}</td></tr>`).join('');
+
+                // Build assignments table
+                const asgns = Object.entries(data.assignments || {});
+                const asgRows = asgns.map(([fn, asgn]) => {
+                    const ok = asgn.satisfied_by !== 'insufficient';
+                    const byPin = asgn.satisfied_by === 'pin_function_table';
+                    const icon = ok ? (byPin ? '📍' : '✅') : '❌';
+                    const pinDisplay = byPin ? `<strong>${asgn.pin_name}</strong> AF${asgn.alternate_function}` : asgn.pin_name;
+                    return `<tr style='border-bottom:1px solid #f1f5f9'>
+                        <td style='padding:0.35rem 0.5rem'>${icon}</td>
+                        <td style='padding:0.35rem 0.5rem;font-weight:600'>${asgn.function_type.toUpperCase()}</td>
+                        <td style='padding:0.35rem 0.5rem;font-size:0.85rem'>${asgn.function_name || '—'}</td>
+                        <td style='padding:0.35rem 0.5rem;font-family:monospace;font-size:0.82rem'>${pinDisplay}</td>
+                        <td style='padding:0.35rem 0.5rem;font-size:0.78rem;color:#64748b;max-width:260px'>${asgn.notes}</td>
+                    </tr>`;
+                }).join('');
+
+                const unassigned = (data.unassigned || []);
+                const statusBanner = data.success
+                    ? `<div style='background:#dcfce7;color:#166534;padding:0.6rem 1rem;border-radius:6px;font-weight:700;margin-bottom:0.75rem'>✅ All ${asgns.length} peripheral requirement(s) satisfied on <strong>${data.mpn}</strong></div>`
+                    : `<div style='background:#fef2f2;color:#991b1b;padding:0.6rem 1rem;border-radius:6px;font-weight:700;margin-bottom:0.75rem'>⚠️ ${unassigned.length} requirement(s) cannot be satisfied: ${unassigned.join(', ')}</div>`;
+
+                const pinTableNote = data.has_detailed_pin_table
+                    ? `<div style='background:#eff6ff;color:#1e40af;padding:0.4rem 0.75rem;border-radius:4px;font-size:0.8rem;margin-bottom:0.5rem'>📍 Detailed AF pin table available for ${data.mpn}</div>`
+                    : `<div style='background:#fffbeb;color:#92400e;padding:0.4rem 0.75rem;border-radius:4px;font-size:0.8rem;margin-bottom:0.5rem'>ℹ️ ${data.notes}</div>`;
+
                 res.innerHTML = `
-                    ${status}
-                    <table style='width:100%;border-collapse:collapse;margin-top:0.75rem;font-size:0.9rem'>
-                        <thead><tr style='background:#f1f5f9'><th style='padding:0.25rem 0.5rem;text-align:left'>Function</th><th style='padding:0.25rem 0.5rem;text-align:left'>Pin</th><th style='padding:0.25rem 0.5rem;text-align:left'>AF</th></tr></thead>
-                        <tbody>${assignments || '<tr><td colspan=3 style="color:#94a3b8">No pin data available for this part yet.</td></tr>'}</tbody>
-                    </table>
-                    ${unassigned ? `<ul style='margin-top:0.5rem'>${unassigned}</ul>` : ''}
+                    ${statusBanner}
+                    ${pinTableNote}
+                    <details open style='margin-bottom:0.75rem'>
+                        <summary style='cursor:pointer;font-weight:600;color:#1e293b;margin-bottom:0.4rem'>📋 Peripheral Capacity (${data.mpn})</summary>
+                        <table style='font-size:0.85rem;border-collapse:collapse'>${capRows}</table>
+                    </details>
+                    <details open>
+                        <summary style='cursor:pointer;font-weight:600;color:#1e293b;margin-bottom:0.4rem'>📌 Assignments</summary>
+                        <table style='width:100%;border-collapse:collapse;font-size:0.85rem'>
+                            <thead><tr style='background:#f1f5f9'>
+                                <th style='padding:0.3rem 0.5rem;text-align:left'></th>
+                                <th style='padding:0.3rem 0.5rem;text-align:left'>Type</th>
+                                <th style='padding:0.3rem 0.5rem;text-align:left'>Signal</th>
+                                <th style='padding:0.3rem 0.5rem;text-align:left'>Pin/Instance</th>
+                                <th style='padding:0.3rem 0.5rem;text-align:left'>Notes</th>
+                            </tr></thead>
+                            <tbody>${asgRows || '<tr><td colspan=5 style="color:#94a3b8;padding:0.5rem">No requirements entered.</td></tr>'}</tbody>
+                        </table>
+                    </details>
                 `;
             } catch (e) {
-                res.innerHTML = `<span style='color:red'>Error: ${e}</span>`;
+                res.innerHTML = `<span style='color:red'>Error: ${e.message}</span>`;
             }
         }
 

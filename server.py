@@ -206,10 +206,164 @@ async def get_part(mpn: str):
 
 @app.post("/api/parts/{part_id}/solve")
 async def solve_pin_mux(part_id: str, requirements: List[Dict]):
-    from solver.pin_mux_solver import PinMuxSolver, PinRequirement, PinType
-    solver = PinMuxSolver(db.pool)
-    reqs = [PinRequirement(function_type=PinType(r['function_type']), function_name=r['function_name'], required=True) for r in requirements]
-    return await solver.solve(part_id, reqs)
+    """
+    Pin Mux Solver — works for ALL 461 parts.
+
+    Strategy:
+    1. Load MCU specs from mcu_specs table (all 461 parts have this).
+    2. For each requested peripheral type, check if the MCU has enough count.
+    3. If mcu_pin_functions data exists (currently only STM32H743), also return
+       actual pin-level AF assignments.
+    4. Returns a structured assignment report showing what is satisfied, what
+       the MCU physically supports, and any shortfalls.
+    """
+    try:
+        part_uuid = UUID(part_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid part_id UUID")
+
+    try:
+        # --- Load MCU info ---
+        async with db.pool.acquire() as conn:
+            part_row = await conn.fetchrow(
+                "SELECT p.mpn, p.manufacturer, p.family FROM parts p WHERE p.id = $1",
+                part_uuid
+            )
+            specs_row = await conn.fetchrow(
+                "SELECT * FROM mcu_specs WHERE part_id = $1",
+                part_uuid
+            )
+            pin_rows = await conn.fetch(
+                "SELECT pin_name, pin_number, af0_function, af1_function, af2_function, "
+                "af3_function, af4_function, af5_function, af6_function, af7_function, "
+                "af8_function, af9_function, af10_function, af11_function, af12_function, "
+                "af13_function, af14_function, af15_function "
+                "FROM mcu_pin_functions WHERE part_id = $1 ORDER BY pin_number",
+                part_uuid
+            )
+
+        if not part_row:
+            raise HTTPException(status_code=404, detail=f"Part {part_id} not found")
+
+        mpn = part_row["mpn"]
+        specs = dict(specs_row) if specs_row else {}
+
+        # --- Peripheral capacity from mcu_specs ---
+        capacity = {
+            "uart":    specs.get("uart_count", 0) or 0,
+            "spi":     specs.get("spi_count", 0) or 0,
+            "i2c":     specs.get("i2c_count", 0) or 0,
+            "can":     (specs.get("can_count", 0) or 0) + (specs.get("can_fd_count", 0) or 0),
+            "can_fd":  specs.get("can_fd_count", 0) or 0,
+            "adc":     specs.get("adc_channels", 0) or 0,
+            "dac":     specs.get("dac_channels", 0) or 0,
+            "pwm":     specs.get("pwm_channels", 0) or 0,
+            "timer":   specs.get("timers_count", 0) or 0,
+            "usb":     (1 if specs.get("usb_fs") else 0) + (1 if specs.get("usb_hs") else 0),
+            "ethernet": 1 if specs.get("ethernet") else 0,
+            "gpio":    specs.get("pin_count", 0) or 0,
+        }
+
+        # --- Build pin map from mcu_pin_functions (may be empty) ---
+        pin_map = {}
+        for row in pin_rows:
+            r = dict(row)
+            funcs = {}
+            for af in range(16):
+                val = r.get(f"af{af}_function")
+                if val:
+                    funcs[af] = val
+            pin_map[r["pin_name"]] = {
+                "pin_number": r["pin_number"],
+                "functions": funcs,
+            }
+
+        has_pin_data = len(pin_map) > 0
+
+        # --- Solve requirements ---
+        assignments = {}
+        unassigned = []
+        capacity_used = {}  # track usage per type
+
+        for req in requirements:
+            func_type = req.get("function_type", "gpio").lower()
+            func_name = req.get("function_name", "").strip()
+            required = req.get("required", True)
+
+            result_entry = {
+                "function_name": func_name,
+                "function_type": func_type,
+                "pin_name": None,
+                "alternate_function": None,
+                "satisfied_by": "peripheral_count",
+                "notes": "",
+            }
+
+            # Step 1: Try exact pin function match from mcu_pin_functions
+            if has_pin_data and func_name:
+                assigned_pins = set(a["pin_name"] for a in assignments.values() if a.get("pin_name"))
+                for pin_name, pdata in pin_map.items():
+                    if pin_name in assigned_pins:
+                        continue
+                    for af, fn in pdata["functions"].items():
+                        if fn.upper() == func_name.upper():
+                            result_entry["pin_name"] = pin_name
+                            result_entry["alternate_function"] = af
+                            result_entry["satisfied_by"] = "pin_function_table"
+                            result_entry["notes"] = f"Direct AF{af} match in {mpn} pin table"
+                            break
+                    if result_entry["pin_name"]:
+                        break
+
+            # Step 2: If no exact match, check peripheral count capacity
+            if not result_entry["pin_name"]:
+                used = capacity_used.get(func_type, 0)
+                avail = capacity.get(func_type, 0)
+                if used < avail:
+                    capacity_used[func_type] = used + 1
+                    result_entry["pin_name"] = f"{func_type.upper()}{used}_pins"
+                    result_entry["alternate_function"] = "N/A"
+                    result_entry["satisfied_by"] = "peripheral_count"
+                    result_entry["notes"] = (
+                        f"{mpn} has {avail} {func_type.upper()} interface(s). "
+                        f"Using instance #{used + 1}. "
+                        + ("Exact pin assignment not available — refer to datasheet pinout table." if not has_pin_data else "No exact pin name match found in AF table.")
+                    )
+                else:
+                    result_entry["satisfied_by"] = "insufficient"
+                    result_entry["notes"] = (
+                        f"{mpn} only has {avail} {func_type.upper()} interface(s) — "
+                        f"cannot satisfy {used + 1} simultaneous {func_type.upper()} requirements."
+                    )
+                    if required:
+                        unassigned.append(func_name or func_type)
+                    continue
+
+            assignments[func_name or f"{func_type}_{len(assignments)}"] = result_entry
+
+        success = len(unassigned) == 0
+
+        return {
+            "success": success,
+            "mpn": mpn,
+            "has_detailed_pin_table": has_pin_data,
+            "peripheral_capacity": capacity,
+            "assignments": assignments,
+            "unassigned": unassigned,
+            "notes": (
+                f"Pin data from AF table ({len(pin_map)} pins). "
+                if has_pin_data else
+                f"Peripheral availability confirmed from mcu_specs. "
+                f"Detailed pin-level AF data not yet loaded for {mpn}. "
+                f"Use STMCubeMX or the {mpn} datasheet for exact pin assignments."
+            ),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Pin mux solve error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/api/parts/{part_id}/power")
