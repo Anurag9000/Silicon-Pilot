@@ -280,6 +280,7 @@
     <script>
         let currentSpecId = null;
         let topCandidateId = null;
+        let secondCandidateId = null;
 
         function setStatusTicker(msg, phase) {
             const phases = [
@@ -316,6 +317,7 @@
             if (!text) return;
 
             topCandidateId = null;
+            secondCandidateId = null;
             document.getElementById('pm-results').textContent = 'Waiting for backend analysis…';
             document.getElementById('specCard').style.display = 'none';
             document.getElementById('questionsCard').style.display = 'none';
@@ -374,6 +376,7 @@
             }
             if (data.candidates && data.candidates.length > 0) {
                 topCandidateId = data.candidates[0].part.id;
+                secondCandidateId = data.candidates.length > 1 ? data.candidates[1].part.id : null;
             }
             renderCandidates(data.candidates, data);
         }
@@ -587,9 +590,14 @@
                 alert("Please analyze requirements first to find a top candidate.");
                 return;
             }
+            // If user clicks Debate on the top card itself, auto-debate against runner-up
+            let debateAltId = altId;
             if (topCandidateId === altId) {
-                alert("This is already the top-ranked candidate. Try debating against another part.");
-                return;
+                if (!secondCandidateId) {
+                    alert("Need at least two candidates to debate. Try a broader query.");
+                    return;
+                }
+                debateAltId = secondCandidateId;
             }
             
             setLoading(true);
@@ -600,7 +608,7 @@
                     body: JSON.stringify({
                         spec_id: currentSpecId,
                         top_part_id: topCandidateId,
-                        alt_part_id: altId
+                        alt_part_id: debateAltId
                     })
                 });
                 const data = await response.json();
@@ -954,8 +962,27 @@
         }
 
         function setLoading(isLoading) {
-            // No-op: loading is now communicated via setStatusTicker instead of
-            // blocking the entire page body with pointer-events:none.
+            let overlay = document.getElementById('global-loading-overlay');
+            if (isLoading) {
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'global-loading-overlay';
+                    overlay.style = 'position:fixed; inset:0; background:rgba(255,255,255,0.8); z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; backdrop-filter:blur(3px);';
+                    overlay.innerHTML = `
+                        <div style="width: 50px; height: 50px; border: 4px solid #e2e8f0; border-top: 4px solid #2563eb; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+                        <div style="margin-top: 1.5rem; font-weight: 700; color: #1e293b; font-size: 1.2rem;">Computing AI Analysis...</div>
+                        <div style="color: #64748b; font-size: 0.95rem; margin-top: 0.5rem; animation: pulse 1.5s infinite;">Please wait while the LLM engine processes your request.</div>
+                    `;
+                    document.body.appendChild(overlay);
+                }
+                overlay.style.display = 'flex';
+                document.body.style.pointerEvents = 'none';
+                overlay.style.pointerEvents = 'auto';
+            } else {
+                if (overlay) overlay.style.display = 'none';
+                document.body.style.pointerEvents = 'auto';
+            }
         }
 
         // --- PIN MUX FUNCTIONS ---

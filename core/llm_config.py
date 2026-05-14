@@ -167,6 +167,7 @@ def chat(messages: list[dict], model: str | None = None,
         messages=messages,
         temperature=temperature if temperature is not None else TEMPERATURE,
         max_tokens=max_tokens or MAX_TOKENS,
+        extra_body={"keep_alive": 0} if LLM_PROVIDER == "ollama" else None,
     )
     return resp.choices[0].message.content or ""
 
@@ -187,6 +188,7 @@ async def achat(messages: list[dict], model: str | None = None,
         messages=messages,
         temperature=temperature if temperature is not None else TEMPERATURE,
         max_tokens=max_tokens or MAX_TOKENS,
+        extra_body={"keep_alive": 0} if LLM_PROVIDER == "ollama" else None,
     )
     return resp.choices[0].message.content or ""
 

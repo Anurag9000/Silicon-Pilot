@@ -8,6 +8,22 @@ set -e
 OS_NAME=$(uname -s | tr '[:upper:]' '[:lower:]')
 echo "Detected OS: $OS_NAME"
 
+# Trap Ctrl+C (SIGINT) to clean up
+cleanup() {
+    echo -e "\n🛑 Stopping Silicon-Pilot..."
+    echo "🧹 Freeing GPU VRAM (unloading LLM)..."
+    curl -s -X POST http://localhost:11434/api/generate -d '{"model": "qwen2.5:7b", "keep_alive": 0}' > /dev/null || true
+    echo "🛑 Killing Uvicorn backend..."
+    if [[ -n "$SERVER_PID" ]]; then
+        kill $SERVER_PID 2>/dev/null || true
+    fi
+    exit 0
+}
+trap cleanup SIGINT SIGTERM
+
+echo "🧹 Initial GPU check: Unloading any stuck LLM models to free VRAM..."
+curl -s -X POST http://localhost:11434/api/generate -d '{"model": "qwen2.5:7b", "keep_alive": 0}' > /dev/null || true
+
 # 2. Check dependencies
 if ! command -v python3 &> /dev/null; then
     echo " Error: python3 is not installed. Please install Python 3.9+."
