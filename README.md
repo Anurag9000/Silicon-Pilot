@@ -64,3 +64,10 @@ python server.py
 - **Advanced Power Profiler**: Define custom duty cycles (Run, Sleep, Stop) and active peripherals. The tool computes real-world average current draw and estimated battery life using Peukert-corrected chemistry derating from datasheet seed data.
 - **PCB Manufacturing Cost Analyzer**: Evaluates the mechanical complexity of MCU packages (LQFP, BGA, WLCSP, etc.), predicts required PCB layers, identifies HDI (High Density Interconnect) requirements, and provides a raw cost multiplier.
 - **Component Ecosystem RAG**: Recommends complete, matched chipsets (CAN transceivers, motor drivers, LDOs, IMUs) that share logic-level compatibility and interface constraints with the selected MCU.
+
+
+## 🎬 Live End-to-End Demo
+
+Watch Silicon-Pilot autonomously analyze requirements, compare hardware, solve pin muxing, evaluate power/package constraints, and build a full ecosystem BOM:
+
+![Silicon-Pilot Live Demo](docs/silicon_pilot_live_demo.webp)
