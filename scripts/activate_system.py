@@ -19,7 +19,7 @@ def run_command(cmd, desc, cwd=ROOT_DIR):
         subprocess.run(cmd, cwd=str(cwd), check=True)
         return True
     except subprocess.CalledProcessError as e:
-        logger.error(f"❌ Failed: {desc} ({e})")
+        logger.error(f" Failed: {desc} ({e})")
         return False
 
 def start_server():
@@ -33,7 +33,7 @@ def start_server():
             subprocess.Popen([PYTHON_EXE, "server.py"], cwd=str(ROOT_DIR), env=os.environ, stdout=log_file, stderr=log_file)
         return True
     except Exception as e:
-        logger.error(f"❌ Failed to start server: {e}")
+        logger.error(f" Failed to start server: {e}")
         return False
 
 def git_sync():
@@ -75,7 +75,7 @@ def main():
     time.sleep(5)
     git_sync()
     
-    logger.info("\n✅ Silicon-Pilot is ACTIVE and UP-TO-DATE!")
+    logger.info("\n Silicon-Pilot is ACTIVE and UP-TO-DATE!")
     logger.info("Server is running in a new window. Access it at http://localhost:8000")
 
 if __name__ == "__main__":

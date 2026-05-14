@@ -44,7 +44,7 @@ async def setup_database():
             await conn.close()
             
     except Exception as e:
-        print(f"❌ Database setup failed: {e}")
+        print(f" Database setup failed: {e}")
 
 if __name__ == "__main__":
     if sys.platform == 'win32':

@@ -87,10 +87,10 @@ def test_bldc_motor_controller_optimization():
     validator = ConstraintValidator()
     is_valid, issues = validator.validate_constraints(result.optimized_constraints)
     
-    print(f"\nVALIDATION: {'✅ PASS' if is_valid else '❌ FAIL'}")
+    print(f"\nVALIDATION: {' PASS' if is_valid else ' FAIL'}")
     if issues:
         for issue in issues:
-            print(f"  ⚠️  {issue}")
+            print(f"    {issue}")
     
     print()
     return result
@@ -170,7 +170,7 @@ def test_validation():
     }
     
     is_valid, issues = validator.validate_constraints(valid_constraints)
-    print(f"Test 1 (Valid): {'✅ PASS' if is_valid else '❌ FAIL'}")
+    print(f"Test 1 (Valid): {' PASS' if is_valid else ' FAIL'}")
     
     # Test 2: Invalid constraints (too high)
     invalid_constraints = {
@@ -184,7 +184,7 @@ def test_validation():
     }
     
     is_valid, issues = validator.validate_constraints(invalid_constraints)
-    print(f"Test 2 (Invalid): {'❌ FAIL' if is_valid else '✅ PASS (correctly detected issues)'}")
+    print(f"Test 2 (Invalid): {' FAIL' if is_valid else ' PASS (correctly detected issues)'}")
     if issues:
         print("  Issues detected:")
         for issue in issues:
@@ -222,7 +222,7 @@ def test_fallback_mode():
     
     assert len(result.optimizations) == 0, "Fallback should return no optimizations"
     assert result.confidence_score == 0.5, "Fallback should have 0.5 confidence"
-    print("✅ Fallback mode works correctly")
+    print(" Fallback mode works correctly")
     print()
 
 
@@ -253,7 +253,7 @@ def run_all_tests():
         print("TEST SUMMARY")
         print("=" * 80)
         print()
-        print("✅ All tests passed!")
+        print(" All tests passed!")
         print()
         print("Features Verified:")
         print("  ✓ LLM-driven constraint optimization")
@@ -263,7 +263,7 @@ def run_all_tests():
         print()
         
     except Exception as e:
-        print(f"\n❌ TEST FAILED: {e}")
+        print(f"\n TEST FAILED: {e}")
         import traceback
         traceback.print_exc()
 

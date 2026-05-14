@@ -54,7 +54,7 @@ def apply_errata():
         conn.close()
         
     except Exception as e:
-        print(f"❌ Database Error: {e}")
+        print(f" Database Error: {e}")
 
 if __name__ == "__main__":
     apply_errata()

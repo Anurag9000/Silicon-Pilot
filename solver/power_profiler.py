@@ -358,7 +358,7 @@ def _build_recommendations(
     if lifetime_days is not None:
         if lifetime_days < 1:
             tips.append(
-                f"⚠️ Battery life < 24 hours ({lifetime_days * 24:.1f}h). "
+                f" Battery life < 24 hours ({lifetime_days * 24:.1f}h). "
                 "Consider a larger battery, duty-cycling more peripherals, or a lower-power MCU family (STM32L-series)."
             )
         elif lifetime_days < 30:
@@ -368,7 +368,7 @@ def _build_recommendations(
             )
         elif lifetime_days > 365:
             tips.append(
-                f"✅ Excellent battery life: {lifetime_days:.0f} days ({lifetime_days / 365:.1f} years). "
+                f" Excellent battery life: {lifetime_days:.0f} days ({lifetime_days / 365:.1f} years). "
                 "Design is well-optimised for low-power operation."
             )
 
@@ -381,7 +381,7 @@ def _build_recommendations(
         )
 
     if not tips:
-        tips.append("✅ Power profile looks well-balanced. No immediate optimisation issues found.")
+        tips.append(" Power profile looks well-balanced. No immediate optimisation issues found.")
 
     return tips
 

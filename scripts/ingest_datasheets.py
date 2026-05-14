@@ -85,9 +85,9 @@ def main():
     # Ingest
     tasks = asyncio.run(ingest_from_manifest(args.manifest))
     
-    print(f"\n✅ Queued {len(tasks)} ingestion tasks")
-    print(f"📊 Monitor progress in Celery logs")
-    print(f"🔍 Check database for ingested parts")
+    print(f"\n Queued {len(tasks)} ingestion tasks")
+    print(f" Monitor progress in Celery logs")
+    print(f" Check database for ingested parts")
 
 
 if __name__ == '__main__':

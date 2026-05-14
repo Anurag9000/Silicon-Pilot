@@ -10,12 +10,12 @@ echo "Detected OS: $OS_NAME"
 
 # 2. Check dependencies
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Error: python3 is not installed. Please install Python 3.9+."
+    echo " Error: python3 is not installed. Please install Python 3.9+."
     exit 1
 fi
 
 if ! command -v psql &> /dev/null; then
-    echo "❌ Error: psql is not installed. Please install PostgreSQL client."
+    echo " Error: psql is not installed. Please install PostgreSQL client."
     exit 1
 fi
 
@@ -26,13 +26,13 @@ export PYTHONPATH=.
 # 4. Check if DB is reachable
 echo "Checking database connection..."
 if ! psql -d "$DATABASE_URL" -c "\q" 2>/dev/null; then
-    echo "⚠️ Database 'siliconpilot' not reachable or doesn't exist."
+    echo " Database 'siliconpilot' not reachable or doesn't exist."
     echo "Running database restore script..."
     bash database/restore_db.sh "1Anurag2Basistha"
 fi
 
 # 5. Start Server
-echo "🚀 Starting Silicon-Pilot backend server on port 8000..."
+echo " Starting Silicon-Pilot backend server on port 8000..."
 # Kill any existing server on port 8000
 if [[ "$OS_NAME" == *"linux"* || "$OS_NAME" == *"darwin"* ]]; then
     fuser -k 8000/tcp 2>/dev/null || true
@@ -42,12 +42,12 @@ fi
 python3 -m uvicorn server:app --host 0.0.0.0 --port 8000 > server_output.log 2>&1 &
 SERVER_PID=$!
 
-echo "⏳ Waiting for server to initialize..."
+echo " Waiting for server to initialize..."
 sleep 5
 
 # 6. Open Browser
 URL="http://localhost:8000"
-echo "🌐 Opening frontend at $URL"
+echo " Opening frontend at $URL"
 
 if [[ "$OS_NAME" == *"darwin"* ]]; then
     open "$URL"
@@ -63,5 +63,5 @@ else
     echo "Please open $URL in your browser."
 fi
 
-echo "✅ Silicon-Pilot is running (PID: $SERVER_PID). Press Ctrl+C to stop."
+echo " Silicon-Pilot is running (PID: $SERVER_PID). Press Ctrl+C to stop."
 wait $SERVER_PID

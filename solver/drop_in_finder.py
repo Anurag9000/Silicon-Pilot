@@ -237,7 +237,7 @@ def _build_notes(source: dict, cand: dict, scores: dict) -> List[str]:
         notes.append(f"Pin count change: {src_pins} → {cnd_pins} pins ({delta:+d}). "
                      f"{'Expanded pinout — verify power/GND distribution.' if delta > 0 else 'Reduced pinout — verify all signals fit.'}")
     else:
-        notes.append("✅ Same package family and pin count — physical drop-in replacement.")
+        notes.append(" Same package family and pin count — physical drop-in replacement.")
 
     # Core notes
     src_core = source.get("core") or "?"
@@ -247,7 +247,7 @@ def _build_notes(source: dict, cand: dict, scores: dict) -> List[str]:
                      f"Recompile with matching FPU/DSP flags. "
                      f"{'FPU available on candidate.' if 'F' in cnd_core else 'No FPU on candidate — check floating-point code.'}")
     else:
-        notes.append(f"✅ Same {src_core} core — binary/HAL compatible.")
+        notes.append(f" Same {src_core} core — binary/HAL compatible.")
 
     # Flash/RAM notes
     src_flash = source.get("flash_kb") or 0
@@ -256,9 +256,9 @@ def _build_notes(source: dict, cand: dict, scores: dict) -> List[str]:
     cnd_ram = cand.get("sram_kb") or cand.get("ram_kb") or 0
 
     if cnd_flash < src_flash:
-        notes.append(f"⚠️ Flash reduced: {src_flash}KB → {cnd_flash}KB. May need code-size optimisation.")
+        notes.append(f" Flash reduced: {src_flash}KB → {cnd_flash}KB. May need code-size optimisation.")
     if cnd_ram < src_ram:
-        notes.append(f"⚠️ SRAM reduced: {src_ram}KB → {cnd_ram}KB. Review stack/heap sizes.")
+        notes.append(f" SRAM reduced: {src_ram}KB → {cnd_ram}KB. Review stack/heap sizes.")
 
     # Peripheral notes
     for peri, label in [("can_count","CAN"), ("can_fd_count","CAN-FD"), ("uart_count","UART"),
@@ -266,11 +266,11 @@ def _build_notes(source: dict, cand: dict, scores: dict) -> List[str]:
         src_v = source.get(peri) or 0
         cnd_v = cand.get(peri) or 0
         if src_v > 0 and cnd_v < src_v:
-            notes.append(f"⚠️ {label} count reduced: {src_v} → {cnd_v}. May need external peripheral expander.")
+            notes.append(f" {label} count reduced: {src_v} → {cnd_v}. May need external peripheral expander.")
 
     # Voltage notes
     if scores["voltage"] < 0.9:
-        notes.append(f"⚠️ VDD range mismatch. Verify power rail compatibility before swapping.")
+        notes.append(f" VDD range mismatch. Verify power rail compatibility before swapping.")
 
     return notes
 

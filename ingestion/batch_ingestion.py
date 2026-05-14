@@ -314,7 +314,7 @@ class IngestionManager:
         
         # Summary
         print("=" * 80)
-        print(f"✅ Ingestion Complete: {total_count} components added")
+        print(f" Ingestion Complete: {total_count} components added")
         print("=" * 80)
         
         return total_count

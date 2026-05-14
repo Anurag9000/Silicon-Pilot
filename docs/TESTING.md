@@ -4,7 +4,7 @@ Silicon-Pilot includes a comprehensive test suite covering deterministic filteri
 
 ---
 
-## 🧪 Quick Verification
+##  Quick Verification
 
 Run the quick test to verify the ingestion pipeline and solver logic without a database:
 ```bash
@@ -13,7 +13,7 @@ python quick_test.py
 
 ---
 
-## 🛠️ Automated Test Categories
+##  Automated Test Categories
 
 ### 1. Hard Filter Tests
 Verifies that the solver never violates hard constraints and remains 100% deterministic over 100+ runs.
@@ -41,7 +41,7 @@ pytest tests/test_integration.py -v
 
 ---
 
-## 🏃 Running All Tests
+##  Running All Tests
 
 Inside the Docker container (ensures correct environment):
 ```bash
@@ -55,7 +55,7 @@ pytest .
 
 ---
 
-## 📊 Evaluation Metrics
+##  Evaluation Metrics
 
 When running tests, pay attention to these key indicators:
 - **Hallucination Rate**: (Must be 0.0) Checked by verifying every recommended spec field exists in the Evidence table.
@@ -64,7 +64,7 @@ When running tests, pay attention to these key indicators:
 
 ---
 
-## 📝 Writing New Tests
+##  Writing New Tests
 
 New golden tests should be added to `tests/test_golden_scenarios.py`. Use the following pattern:
 

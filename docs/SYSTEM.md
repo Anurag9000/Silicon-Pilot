@@ -394,4 +394,4 @@ assert result1.recommendations == result2.recommendations  # MUST be identical
 
 ---
 
-**Status:** 🚧 Active Development | **Version:** 0.1.0-alpha
+**Status:**  Active Development | **Version:** 0.1.0-alpha

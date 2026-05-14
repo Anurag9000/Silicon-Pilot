@@ -4,7 +4,7 @@
 
 ---
 
-## 🔄 The Complete Pipeline
+##  The Complete Pipeline
 
 ```
 User Input
@@ -30,7 +30,7 @@ Final Output (BOM + Config + CAD Files)
 
 ---
 
-## 📐 Component #4: Architecture Compiler
+##  Component #4: Architecture Compiler
 
 ### What It Does
 
@@ -101,7 +101,7 @@ Output:
 
 ---
 
-## 🔧 Component #5: Subsystem Solvers
+##  Component #5: Subsystem Solvers
 
 ### What They Do
 
@@ -211,7 +211,7 @@ Every recommendation includes **proof**:
 
 ---
 
-## 🎯 Component #6: BOM Composer
+##  Component #6: BOM Composer
 
 ### What It Does
 
@@ -265,24 +265,24 @@ Alternative 2: Higher performance
 
 ---
 
-## 🤖 Where We Can Add MORE LLM Intelligence
+##  Where We Can Add MORE LLM Intelligence
 
 ### Current State (Deterministic vs LLM)
 
 | Component | Current | LLM Potential |
 |-----------|---------|---------------|
-| Intent Classification | ✅ LLM | Already using |
-| Template Matching | ❌ Keyword | 🎯 Can improve |
-| Dynamic Questioning | ✅ LLM | Already using |
-| Architecture Compiler | ❌ Rule-based | 🎯 Can improve |
-| Subsystem Solvers | ❌ SQL + Scoring | 🎯 Can improve |
-| BOM Composer | ❌ Deterministic | 🎯 Can improve |
-| Configuration Generator | ❌ Template-based | 🎯 Can improve |
-| Cost Optimization | ❌ Heuristics | 🎯 Can improve |
+| Intent Classification |  LLM | Already using |
+| Template Matching |  Keyword |  Can improve |
+| Dynamic Questioning |  LLM | Already using |
+| Architecture Compiler |  Rule-based |  Can improve |
+| Subsystem Solvers |  SQL + Scoring |  Can improve |
+| BOM Composer |  Deterministic |  Can improve |
+| Configuration Generator |  Template-based |  Can improve |
+| Cost Optimization |  Heuristics |  Can improve |
 
 ---
 
-## 🎯 LLM Enhancement Opportunities
+##  LLM Enhancement Opportunities
 
 ### 1. **Smarter Template Matching** (HIGH IMPACT)
 
@@ -572,26 +572,26 @@ Make it understandable and helpful.
 
 ---
 
-## 🎯 Implementation Priority
+##  Implementation Priority
 
 ### Phase 1 (Immediate - High Impact)
-1. ✅ **DONE**: LLM-driven dynamic questioning
-2. ✅ **DONE**: LLM-enhanced template matching
-3. ✅ **DONE**: Natural language explanations
+1.  **DONE**: LLM-driven dynamic questioning
+2.  **DONE**: LLM-enhanced template matching
+3.  **DONE**: Natural language explanations
 
 ### Phase 2 (Short Term - Medium Impact)
-4. ✅ **DONE**: Intelligent constraint optimization
-5. 🔄 **TODO**: Context-aware component selection
-6. 🔄 **TODO**: Smart compatibility checking
+4.  **DONE**: Intelligent constraint optimization
+5.  **TODO**: Context-aware component selection
+6.  **TODO**: Smart compatibility checking
 
 ### Phase 3 (Long Term - Nice to Have)
-7. 🔄 **TODO**: LLM configuration generation
-8. 🔄 **TODO**: Design review and suggestions
-9. 🔄 **TODO**: Learning from user feedback
+7.  **TODO**: LLM configuration generation
+8.  **TODO**: Design review and suggestions
+9.  **TODO**: Learning from user feedback
 
 ---
 
-## 📊 Summary
+##  Summary
 
 ### What Each Component Does
 
@@ -603,16 +603,16 @@ Make it understandable and helpful.
 
 ### Current LLM Usage
 
-✅ Intent Classification  
-✅ Dynamic Questioning  
-✅ Template Matching  
-✅ Constraint Optimization  
-✅ Explanations  
-❌ Context-Aware Component Selection (Planned)  
-❌ Smart BOM Compatibility Checking (Planned)  
-❌ Configuration Generation via LLM (Planned)  
-❌ Design Review & Suggestions (Planned)  
-❌ Learning from User Feedback (Planned)  
+ Intent Classification  
+ Dynamic Questioning  
+ Template Matching  
+ Constraint Optimization  
+ Explanations  
+ Context-Aware Component Selection (Planned)  
+ Smart BOM Compatibility Checking (Planned)  
+ Configuration Generation via LLM (Planned)  
+ Design Review & Suggestions (Planned)  
+ Learning from User Feedback (Planned)  
 
 ### The Balance
 

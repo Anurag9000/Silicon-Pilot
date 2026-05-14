@@ -8,7 +8,7 @@ Silicon-Pilot ingests real STM32 datasheet PDFs and provides deep parametric ana
 
 ---
 
-## ✅ Implemented Features
+##  Implemented Features
 
 | Feature | Endpoint / Module |
 |---|---|
@@ -24,7 +24,7 @@ Silicon-Pilot ingests real STM32 datasheet PDFs and provides deep parametric ana
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ```bash
 # Start with mock SQLite (no Postgres needed)
@@ -49,7 +49,7 @@ python server.py
 
 ---
 
-## 📖 Documentation
+##  Documentation
 
 | Doc | Purpose |
 |---|---|
@@ -66,14 +66,14 @@ python server.py
 - **Component Ecosystem RAG**: Recommends complete, matched chipsets (CAN transceivers, motor drivers, LDOs, IMUs) that share logic-level compatibility and interface constraints with the selected MCU.
 
 
-## 🎬 Live End-to-End Demo
+##  Live End-to-End Demo
 
 Watch Silicon-Pilot autonomously analyze requirements, compare hardware, solve pin muxing, evaluate power/package constraints, and build a full ecosystem BOM:
 
 ![Silicon-Pilot Live Demo](docs/silicon_pilot_live_demo.webp)
 
 
-## 🤖 Changing the LLM Model
+##  Changing the LLM Model
 Silicon-Pilot uses Ollama by default for fully local, private AI inference. If you want to change the underlying model (e.g., from `qwen2.5:1.5b` to `llama3.2` or switch to OpenAI):
 
 1. Open the file: `core/llm_config.py`

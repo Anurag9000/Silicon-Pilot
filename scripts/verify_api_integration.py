@@ -70,9 +70,9 @@ def verify_api():
             if response.status_code == 200:
                 print("✓ Selection logged successfully.")
             else:
-                print(f"⚠ /api/log_selection returned {response.status_code}")
+                print(f" /api/log_selection returned {response.status_code}")
         except Exception as e:
-            print(f"⚠ /api/log_selection error: {e}")
+            print(f" /api/log_selection error: {e}")
 
     print("✓ API Integration verification complete.")
 

@@ -152,7 +152,7 @@ async def ingest():
                 errors += 1
                 print(f"  ERR {mpn}: {e}")
 
-    print(f"\n✅ Done: {inserted} inserted/updated, {skipped} skipped, {errors} errors")
+    print(f"\n Done: {inserted} inserted/updated, {skipped} skipped, {errors} errors")
     count = await pool.fetchval("SELECT COUNT(*) FROM parts")
     spec_count = await pool.fetchval("SELECT COUNT(*) FROM mcu_specs WHERE sram_kb > 0")
     print(f"   Total parts in DB: {count}")

@@ -8,7 +8,7 @@ Checks performed:
     1. Voltage level compatibility (MCU I/O vs peripheral logic levels)
     2. Power supply adequacy (LDO/PMIC output vs MCU + peripheral power draw)
     3. Temperature range overlap (all parts must share a common operating window)
-    4. CAN bus compatibility (baud rate, transceiver ↔ MCU CAN peripheral)
+    4. CAN bus compatibility (baud rate, transceiver  MCU CAN peripheral)
     5. Interface speeds (SPI/I2C max rate consistency)
     6. Package/signal integrity (optional note-level warnings)
 """

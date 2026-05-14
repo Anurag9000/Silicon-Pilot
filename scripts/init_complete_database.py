@@ -82,7 +82,7 @@ def main():
     
     success, stdout, stderr = run_psql(f"DROP DATABASE IF EXISTS {DB_NAME};", db="postgres")
     if not success:
-        print(f"  ⚠ Warning: {stderr}")
+        print(f"   Warning: {stderr}")
     
     success, stdout, stderr = run_psql(f"CREATE DATABASE {DB_NAME};", db="postgres")
     if success:
@@ -106,7 +106,7 @@ def main():
     if success:
         print("  ✓ Component tables applied\n")
     else:
-        print(f"  ⚠ Warning: {stderr}\n")
+        print(f"   Warning: {stderr}\n")
     
     # Step 4: Apply additional schemas
     print("[4/8] Applying additional schemas...")
@@ -126,7 +126,7 @@ def main():
             if success:
                 print(f"  ✓ {schema_name}")
             else:
-                print(f"  ⚠ {schema_name}: {stderr[:50]}")
+                print(f"   {schema_name}: {stderr[:50]}")
     print()
     
     # Step 5: Populate STM32 MCUs
@@ -143,7 +143,7 @@ def main():
     if success:
         print(stdout)
     else:
-        print(f"  ⚠ Warning: {stderr[:200]}\n")
+        print(f"   Warning: {stderr[:200]}\n")
     
     # Step 7: Populate firmware stacks
     print("[7/8] Populating firmware stacks...")
@@ -151,7 +151,7 @@ def main():
     if success:
         print(stdout)
     else:
-        print(f"  ⚠ Warning: {stderr[:200]}\n")
+        print(f"   Warning: {stderr[:200]}\n")
     
     # Step 8: Populate reference designs
     print("[8/8] Populating reference designs...")
@@ -159,7 +159,7 @@ def main():
     if success:
         print(stdout)
     else:
-        print(f"  ⚠ Warning: {stderr[:200]}\n")
+        print(f"   Warning: {stderr[:200]}\n")
     
     # Final verification
     print("="*70)

@@ -67,10 +67,10 @@ async def run_full_ingestion(limit: int = 100):
             try:
                 extractor = STM32DatasheetExtractor(pdf_path)
                 await extractor.save_to_db(conn, part_id)
-                logger.info(f"  ✅ Extraction complete for {mpn}")
+                logger.info(f"   Extraction complete for {mpn}")
                 success_count += 1
             except Exception as e:
-                logger.error(f"  ❌ Extraction failed for {mpn}: {e}")
+                logger.error(f"   Extraction failed for {mpn}: {e}")
                 
         logger.info(f"Full ingestion batch complete. Successfully processed {success_count}/{len(rows)} parts.")
 

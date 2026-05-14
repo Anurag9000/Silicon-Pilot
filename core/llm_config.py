@@ -27,19 +27,19 @@ QUICK CHEAT-SHEET
 
 Available Ollama models on this machine (from `ollama list`):
   qwen2.5:0.5b      397  MB  ← fastest, lowest quality
-  qwen2.5:1.5b      986  MB  ← DEFAULT: fully GPU-resident on RTX 3050 6GB ✅
+  qwen2.5:1.5b      986  MB  ← DEFAULT: fully GPU-resident on RTX 3050 6GB 
   llama3.2          2.0  GB
   mistral           4.4  GB
-  qwen2.5:7b        4.7  GB  ← HIGH QUALITY but tight on 6 GB VRAM ⚠️
+  qwen2.5:7b        4.7  GB  ← HIGH QUALITY but tight on 6 GB VRAM 
   deepseek-r1:8b    5.2  GB  ← may spill to CPU RAM on 6 GB GPU
   qwen2.5vl:7b      6.0  GB  ← multimodal, will NOT fit in 6 GB
 
 VRAM BUDGET (RTX 3050 6 GB Laptop):
   OS/driver overhead  ~0.5–1.0 GB
   Available for model ~5.0–5.5 GB usable
-  qwen2.5:1.5b Q4     ~1.0 GB  → 100% GPU, 2–5s inference  ✅ RECOMMENDED
-  qwen2.5:7b   Q4     ~5.2 GB  → barely fits, may spill to CPU RAM, fans 🌡️
-  deepseek-r1:8b Q4   ~5.4 GB  → likely CPU spill, slow ❌
+  qwen2.5:1.5b Q4     ~1.0 GB  → 100% GPU, 2–5s inference   RECOMMENDED
+  qwen2.5:7b   Q4     ~5.2 GB  → barely fits, may spill to CPU RAM, fans 
+  deepseek-r1:8b Q4   ~5.4 GB  → likely CPU spill, slow 
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ import os
 LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "ollama")
 
 # Model name — must exist in your Ollama library or be a valid OpenAI model ID
-# qwen2.5:0.5b = 397 MB  — lightning fast, fully GPU, sub-second on RTX 3050 ✅ DEFAULT
+# qwen2.5:0.5b = 397 MB  — lightning fast, fully GPU, sub-second on RTX 3050  DEFAULT
 # qwen2.5:1.5b = 986 MB  — fast, fully GPU, 2-5s
 # qwen2.5:7b   = 4.7 GB  — may spill to CPU RAM on 6 GB GPU → slow (60-90s)
 LLM_MODEL: str = os.environ.get("LLM_MODEL", "qwen2.5:0.5b")

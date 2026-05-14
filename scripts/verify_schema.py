@@ -42,7 +42,7 @@ def verify():
                 cur.execute(stmt)
                 print("✓ Success")
             except Exception as e:
-                print(f"❌ FAILED: {e}")
+                print(f" FAILED: {e}")
                 print(f"Full Statement:\n{stmt}")
                 conn.rollback() # Rollback transaction to continue? 
                 # Actually if we want to proceed we need valid state.

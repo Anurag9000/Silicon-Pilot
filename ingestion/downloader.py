@@ -53,7 +53,7 @@ class DatasheetDownloader:
                 # Content-Type Check (ST sometimes redirects pdf->html on 404 soft landing)
                 content_type = response.headers.get('Content-Type', '').lower()
                 if 'html' in content_type:
-                    logger.warning(f"  ⚠️ URL returned HTML instead of file (Content-Type: {content_type}). Skipping.")
+                    logger.warning(f"   URL returned HTML instead of file (Content-Type: {content_type}). Skipping.")
                     return None
                 
                 with open(local_path, 'wb') as f:
@@ -62,14 +62,14 @@ class DatasheetDownloader:
             
             # Size check
             if local_path.stat().st_size < 1000:
-                logger.warning(f"  ⚠️ Downloaded file {filename} is too small (<1KB). Deleting.")
+                logger.warning(f"   Downloaded file {filename} is too small (<1KB). Deleting.")
                 local_path.unlink()
                 return None
                 
             return str(local_path)
             
         except Exception as e:
-            logger.error(f"  ❌ Failed to download {url}: {e}")
+            logger.error(f"   Failed to download {url}: {e}")
             if local_path.exists():
                 local_path.unlink()
             return None

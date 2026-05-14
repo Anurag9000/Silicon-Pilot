@@ -392,7 +392,7 @@ def example_usage():
     validator = ConstraintValidator()
     is_valid, issues = validator.validate_constraints(result.optimized_constraints)
     
-    print(f"\nVALIDATION: {'✅ PASS' if is_valid else '❌ FAIL'}")
+    print(f"\nVALIDATION: {' PASS' if is_valid else ' FAIL'}")
     if issues:
         print("  Issues:")
         for issue in issues:

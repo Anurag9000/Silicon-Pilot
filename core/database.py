@@ -49,7 +49,7 @@ class Database:
             max_size=max_size,
             command_timeout=60,
         )
-        logger.info("✅ PostgreSQL connection pool created successfully")
+        logger.info(" PostgreSQL connection pool created successfully")
 
     async def disconnect(self):
         """Close connection pool."""

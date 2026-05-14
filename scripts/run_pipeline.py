@@ -36,7 +36,7 @@ def run_script(script_path, desc):
         )
         return True
     except subprocess.CalledProcessError as e:
-        logger.error(f"❌ Step failed: {desc}")
+        logger.error(f" Step failed: {desc}")
         return False
 
 def main():
@@ -87,7 +87,7 @@ def main():
     if not run_script("ingestion/run_errata_processing.py", "Errata Extraction"):
         return
         
-    logger.info("\n✅ Pipeline Completed Successfully!")
+    logger.info("\n Pipeline Completed Successfully!")
 
 if __name__ == "__main__":
     main()

@@ -31,13 +31,13 @@ async def check_endpoint(session, method, endpoint, payload=None, expected_statu
                 data = await resp.json() if status == 200 else None
         
         if status == expected_status:
-            logger.info(f"✅ {method} {endpoint}: Passed")
+            logger.info(f" {method} {endpoint}: Passed")
             return data
         else:
-            logger.error(f"❌ {method} {endpoint}: Failed (Status {status})")
+            logger.error(f" {method} {endpoint}: Failed (Status {status})")
             return None
     except Exception as e:
-        logger.error(f"❌ {method} {endpoint}: Error ({str(e)})")
+        logger.error(f" {method} {endpoint}: Error ({str(e)})")
         return None
 
 async def verify_component_search(session):
@@ -79,7 +79,7 @@ async def verify_solvers(session):
     # 1. Fetch a valid MCU for solver tests
     mcu_search = await check_endpoint(session, "POST", "/api/search", {"query": "STM32F4", "limit": 1})
     if not mcu_search or not mcu_search["results"]:
-        logger.error("❌ Skipping Solver tests: No MCU found")
+        logger.error(" Skipping Solver tests: No MCU found")
         return
 
     mcu_data = mcu_search["results"][0]

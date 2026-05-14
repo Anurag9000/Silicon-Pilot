@@ -8,8 +8,8 @@ BLUE='\033[0;34m'; GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
 echo -e "${BLUE}=== Silicon-Pilot Demo Setup ===${NC}"
 
 # 1. Check prerequisites
-command -v psql >/dev/null || { echo -e "${RED}❌ psql not found. Install PostgreSQL.${NC}"; exit 1; }
-command -v python3 >/dev/null || { echo -e "${RED}❌ python3 not found.${NC}"; exit 1; }
+command -v psql >/dev/null || { echo -e "${RED} psql not found. Install PostgreSQL.${NC}"; exit 1; }
+command -v python3 >/dev/null || { echo -e "${RED} python3 not found.${NC}"; exit 1; }
 
 # 2. Get DB credentials
 read -p "PostgreSQL user [postgres]: " PG_USER
@@ -30,12 +30,12 @@ psql "postgresql://${PG_USER}:${PG_PASS}@${PG_HOST}:5432/postgres" -c "CREATE DA
 # 4. Load schema
 echo -e "${BLUE}Loading schema...${NC}"
 psql "$DB_URL" < database/dumps/schema.sql
-echo -e "${GREEN}✅ Schema loaded${NC}"
+echo -e "${GREEN} Schema loaded${NC}"
 
 # 5. Load data
 echo -e "${BLUE}Loading 461 real STM32 boards + 5071 datasheet parameters...${NC}"
 psql "$DB_URL" < database/dumps/hardware_data.sql
-echo -e "${GREEN}✅ Data loaded${NC}"
+echo -e "${GREEN} Data loaded${NC}"
 
 # 6. Create .env
 cat > .env << EOF
@@ -46,12 +46,12 @@ LLM_MODEL=qwen2.5:1.5b
 OLLAMA_HOST=http://localhost:11434
 LOG_LEVEL=INFO
 EOF
-echo -e "${GREEN}✅ .env created${NC}"
+echo -e "${GREEN} .env created${NC}"
 
 # 7. Install dependencies
 echo -e "${BLUE}Installing Python dependencies...${NC}"
 pip install -r requirements.txt -q
-echo -e "${GREEN}✅ Dependencies installed${NC}"
+echo -e "${GREEN} Dependencies installed${NC}"
 
 echo ""
 echo -e "${GREEN}=== Setup Complete! ===${NC}"

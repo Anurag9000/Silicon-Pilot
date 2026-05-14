@@ -47,7 +47,7 @@ def main():
         subprocess.run([PSQL, "-U", USER, "-h", HOST, "-d", DB_NAME, "-f", str(BASE_DIR / "database/component_tables.sql")], env=PG_ENV, check=True)
         print("✓ Database refreshed.")
     except Exception as e:
-        print(f"❌ Database error: {e}")
+        print(f" Database error: {e}")
         return
 
     # 3. Purge Data
@@ -68,7 +68,7 @@ def main():
     try:
         subprocess.run([sys.executable, str(BASE_DIR / "ingestion/stm32_downloader.py")], check=True)
     except Exception as e:
-        print(f"❌ Download failed: {e}")
+        print(f" Download failed: {e}")
         return
 
     # 5. Run Ingestion
@@ -76,7 +76,7 @@ def main():
     try:
         subprocess.run([sys.executable, str(BASE_DIR / "ingestion/run_stm32_ingestion.py")], check=True)
     except Exception as e:
-        print(f"❌ Ingestion failed: {e}")
+        print(f" Ingestion failed: {e}")
         return
 
     print("\n--- RESET COMPLETE ---")

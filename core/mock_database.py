@@ -407,7 +407,7 @@ def enable_mock_mode():
         database.get_pool = get_mock_pool
         print("✓ Mock database mode enabled (SQLite)")
     except ImportError:
-        print("⚠ Could not patch database module")
+        print(" Could not patch database module")
 
 
 if __name__ == "__main__":

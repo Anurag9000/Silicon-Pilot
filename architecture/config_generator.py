@@ -425,7 +425,7 @@ class ConfigurationGenerator:
             for item in bom.items:
                 if "5V" in item.description or "5.0" in str(item):
                     warnings.append(
-                        f"⚠ {item.recommended_mpn} operates at 5V - may require level shifter for 3.3V MCU"
+                        f" {item.recommended_mpn} operates at 5V - may require level shifter for 3.3V MCU"
                     )
         
         # Power budget warnings
@@ -434,7 +434,7 @@ class ConfigurationGenerator:
             for power in power_items:
                 if "250mA" in power.description:
                     warnings.append(
-                        f"⚠ {power.recommended_mpn} limited to 250mA - verify total system current"
+                        f" {power.recommended_mpn} limited to 250mA - verify total system current"
                     )
         
         return warnings
@@ -546,7 +546,7 @@ class ConfigurationGenerator:
         
         # Warnings
         if config.warnings:
-            lines.extend(["---", "", "## ⚠️ Warnings", ""])
+            lines.extend(["---", "", "##  Warnings", ""])
             for warning in config.warnings:
                 lines.append(f"{warning}  ")
             lines.append("")

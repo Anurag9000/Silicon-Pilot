@@ -146,7 +146,7 @@ async def test_backtracking():
         else:
              print("  Assignments WRONG (Greedy?)")
     else:
-        print("❌ Backtracking Test Failed!")
+        print(" Backtracking Test Failed!")
         print(result)
 
 async def test_constraints():
@@ -204,7 +204,7 @@ async def test_constraints():
         print("✓ Constraint Test Passed! (Correctly failed to assign conflicting pins)")
         print(f"  Unassigned: {result['unassigned']}")
     else:
-        print("❌ Constraint Test Failed! (Assigned conflicting pins)")
+        print(" Constraint Test Failed! (Assigned conflicting pins)")
         print(result['assignments'])
 
 if __name__ == "__main__":

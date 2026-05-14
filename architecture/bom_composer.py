@@ -292,7 +292,7 @@ class BOMComposer:
             if "CAN" in trans_item.description:
                 if "5V" in trans_item.notes or "5.0" in str(trans_item):
                     bom.warnings.append(
-                        f"⚠ {trans_item.recommended_mpn} requires 5V supply (may need level shifter for 3.3V MCU)"
+                        f" {trans_item.recommended_mpn} requires 5V supply (may need level shifter for 3.3V MCU)"
                     )
     
     def _estimate_power_cost(self, power: Any) -> float:

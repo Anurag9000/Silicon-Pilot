@@ -64,7 +64,7 @@ async def run_ingestion():
             print(f"Inserted {parts_inserted}/{len(ALL_PARTS)}...")
             
     await conn.close()
-    print(f"✅ Exhaustive ingestion complete! Inserted {parts_inserted} MCU variations across all STM32 families.")
+    print(f" Exhaustive ingestion complete! Inserted {parts_inserted} MCU variations across all STM32 families.")
 
 if __name__ == "__main__":
     asyncio.run(run_ingestion())

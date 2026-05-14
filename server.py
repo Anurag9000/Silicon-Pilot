@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
 
     # Connect to real PostgreSQL DB — will raise if DATABASE_URL is not set
     await db.connect()
-    logger.info("✅ PostgreSQL connection established")
+    logger.info(" PostgreSQL connection established")
 
     # Initialize components
     db_ops = DatabaseOperations(db.pool)
@@ -105,7 +105,7 @@ async def lifespan(app: FastAPI):
     # Log DB stats
     try:
         stats = await db_ops.get_stats()
-        logger.info(f"✅ DB stats: {stats}")
+        logger.info(f" DB stats: {stats}")
     except Exception as e:
         logger.warning(f"Could not fetch DB stats: {e}")
 

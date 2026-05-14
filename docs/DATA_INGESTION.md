@@ -60,9 +60,9 @@ python scripts/collect_stm32_datasheets.py
 
 **Example output:**
 ```
-✅ Downloaded 15 STM32 datasheets
-📁 Saved to: data\stm32_datasheets
-📋 Manifest: data\stm32_datasheets\manifest.json
+ Downloaded 15 STM32 datasheets
+ Saved to: data\stm32_datasheets
+ Manifest: data\stm32_datasheets\manifest.json
 ```
 
 ---

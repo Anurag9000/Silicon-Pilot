@@ -4,39 +4,39 @@
 
 ---
 
-## 🎯 The Core Principle: LLM ≠ Source of Truth
+##  The Core Principle: LLM ≠ Source of Truth
 
 ### What LLMs Do (Interface Layer)
-✅ Parse user intent  
-✅ Ask clarifying questions  
-✅ Optimize constraints (suggestions only)  
-✅ Explain decisions in natural language  
-✅ Match templates semantically  
+ Parse user intent  
+ Ask clarifying questions  
+ Optimize constraints (suggestions only)  
+ Explain decisions in natural language  
+ Match templates semantically  
 
 ### What LLMs NEVER Do (Truth Layer)
-❌ Generate component specifications  
-❌ Invent part numbers  
-❌ Make up datasheet values  
-❌ Create constraints without validation  
-❌ Recommend components not in database  
+ Generate component specifications  
+ Invent part numbers  
+ Make up datasheet values  
+ Create constraints without validation  
+ Recommend components not in database  
 
 ---
 
-## 🔒 The Multi-Layer Anti-Hallucination System
+##  The Multi-Layer Anti-Hallucination System
 
 ### Layer 1: Database is the ONLY Source of Truth
 
 **All component data comes from PostgreSQL database**:
 
 ```python
-# ✅ CORRECT: Query database
+#  CORRECT: Query database
 candidates = database.query("""
     SELECT * FROM mcu_specs
     WHERE flash_kb >= 256
       AND can_count >= 2
 """)
 
-# ❌ NEVER: Ask LLM for specs
+#  NEVER: Ask LLM for specs
 # "What MCUs have 256KB Flash and 2 CAN?"  # WRONG!
 ```
 
@@ -75,13 +75,13 @@ optimization = {
     "reasoning": "BLDC FOC needs 1 advanced timer with 6 channels"
 }
 
-# ✅ VALIDATION STEP 1: Check against MCU capabilities
+#  VALIDATION STEP 1: Check against MCU capabilities
 validator = ConstraintValidator()
 is_valid, issues = validator.validate_constraints({
     "peripherals_min": {"pwm_timers": 1}
 })
 
-# ✅ VALIDATION STEP 2: Check against database
+#  VALIDATION STEP 2: Check against database
 mcus_with_1_advanced_timer = database.query("""
     SELECT COUNT(*) FROM mcu_specs
     WHERE advanced_timers >= 1
@@ -91,7 +91,7 @@ if mcus_with_1_advanced_timer == 0:
     # Reject optimization - no MCUs match
     reject_optimization()
 
-# ✅ VALIDATION STEP 3: Expert review (optional)
+#  VALIDATION STEP 3: Expert review (optional)
 if optimization.confidence < 0.8:
     flag_for_human_review()
 ```
@@ -123,7 +123,7 @@ class ComponentRecommendation:
 **If evidence is missing → Component is NOT recommended**:
 
 ```python
-# ✅ CORRECT: Component with evidence
+#  CORRECT: Component with evidence
 {
   "mpn": "STM32F405RGT6",
   "flash_kb": 1024,
@@ -131,7 +131,7 @@ class ComponentRecommendation:
 }
 # → Recommended ✓
 
-# ❌ REJECTED: Component without evidence
+#  REJECTED: Component without evidence
 {
   "mpn": "STM32F999XXX",  # Doesn't exist
   "flash_kb": 9999,
@@ -190,12 +190,12 @@ dist_data = {
     "source": "Digi-Key"
 }
 
-# ✅ MATCH: Both agree → High confidence
+#  MATCH: Both agree → High confidence
 if mfg_data["flash_kb"] == dist_data["flash_kb"]:
     confidence = 0.95
     publish_to_database()
 
-# ❌ CONFLICT: Sources disagree → Flag for review
+#  CONFLICT: Sources disagree → Flag for review
 else:
     create_conflict_record()
     flag_for_human_review()
@@ -224,7 +224,7 @@ if extraction_confidence < 0.85:
 
 ---
 
-## 🛡️ Specific Anti-Hallucination Safeguards
+##  Specific Anti-Hallucination Safeguards
 
 ### Safeguard #1: LLM Constraint Optimization
 
@@ -234,11 +234,11 @@ if extraction_confidence < 0.85:
 ```
 
 **What happens next**:
-1. ✅ Validate: Do STM32 MCUs have "advanced timers"? → YES
-2. ✅ Validate: Can 1 timer provide 6 PWM channels? → YES (TIM1)
-3. ✅ Validate: Will this work for BLDC? → YES (industry standard)
-4. ✅ Check database: Are there MCUs with this config? → YES (47 MCUs)
-5. ✅ Apply optimization
+1.  Validate: Do STM32 MCUs have "advanced timers"? → YES
+2.  Validate: Can 1 timer provide 6 PWM channels? → YES (TIM1)
+3.  Validate: Will this work for BLDC? → YES (industry standard)
+4.  Check database: Are there MCUs with this config? → YES (47 MCUs)
+5.  Apply optimization
 
 **If ANY validation fails → Reject optimization, use baseline**
 
@@ -253,11 +253,11 @@ community support and lower cost"
 ```
 
 **What happens next**:
-1. ✅ Check: Is F405 in database? → YES
-2. ✅ Check: Does F405 meet requirements? → YES (already passed hard filter)
-3. ✅ Check: Is H743 in database? → YES
-4. ✅ Check: Are prices real? → YES (from database, not LLM)
-5. ✅ Re-rank based on context
+1.  Check: Is F405 in database? → YES
+2.  Check: Does F405 meet requirements? → YES (already passed hard filter)
+3.  Check: Is H743 in database? → YES
+4.  Check: Are prices real? → YES (from database, not LLM)
+5.  Re-rank based on context
 
 **LLM only re-orders existing valid candidates, never invents new ones**
 
@@ -272,11 +272,11 @@ Sensor: 2mA = 222mA. With 20% margin = 266mA. Recommend 1.5A."
 ```
 
 **What happens next**:
-1. ✅ Validate calculations: 150+70+2 = 222? → YES
-2. ✅ Validate margin: 222 * 1.2 = 266? → YES
-3. ✅ Check current specs: Are these from database? → YES
-4. ✅ Check 1.5A supply exists: Query database → YES (TPS62162)
-5. ✅ Show suggestion with evidence
+1.  Validate calculations: 150+70+2 = 222? → YES
+2.  Validate margin: 222 * 1.2 = 266? → YES
+3.  Check current specs: Are these from database? → YES
+4.  Check 1.5A supply exists: Query database → YES (TPS62162)
+5.  Show suggestion with evidence
 
 **All numbers come from database, LLM only does arithmetic**
 
@@ -290,17 +290,17 @@ Sensor: 2mA = 222mA. With 20% margin = 266mA. Recommend 1.5A."
 ```
 
 **What happens next**:
-1. ✅ Validate math: 8 * 336 / 2 = 1344? → NO, should be 168
-2. ✅ Correct formula: 8 * (336/8) / 2 = 168? → YES
-3. ✅ Check against MCU limits: Max PLL_N = 432? → YES
-4. ✅ Check against datasheet: Valid config? → YES
-5. ✅ Generate .ioc file
+1.  Validate math: 8 * 336 / 2 = 1344? → NO, should be 168
+2.  Correct formula: 8 * (336/8) / 2 = 168? → YES
+3.  Check against MCU limits: Max PLL_N = 432? → YES
+4.  Check against datasheet: Valid config? → YES
+5.  Generate .ioc file
 
 **Configuration is validated against MCU reference manual**
 
 ---
 
-## 📊 Evidence Tracking Example
+##  Evidence Tracking Example
 
 **Complete evidence chain for one recommendation**:
 
@@ -363,32 +363,32 @@ Sensor: 2mA = 222mA. With 20% margin = 266mA. Recommend 1.5A."
 
 ---
 
-## ✅ Summary: What's Grounded vs What's LLM
+##  Summary: What's Grounded vs What's LLM
 
 ### 100% Grounded (Database/Evidence)
-✅ Component specifications (Flash, RAM, peripherals)  
-✅ Part numbers (MPNs)  
-✅ Prices (from distributors, updated regularly)  
-✅ Availability (from distributors)  
-✅ Datasheet excerpts  
-✅ Hard constraint filtering  
-✅ Ranking scores  
+ Component specifications (Flash, RAM, peripherals)  
+ Part numbers (MPNs)  
+ Prices (from distributors, updated regularly)  
+ Availability (from distributors)  
+ Datasheet excerpts  
+ Hard constraint filtering  
+ Ranking scores  
 
 ### LLM-Assisted (But Validated)
-🔄 Constraint optimization suggestions → Validated against database  
-🔄 Context-aware re-ranking → Only reorders valid candidates  
-🔄 Compatibility analysis → Uses database specs, LLM does arithmetic  
-🔄 Configuration generation → Validated against reference manual  
+ Constraint optimization suggestions → Validated against database  
+ Context-aware re-ranking → Only reorders valid candidates  
+ Compatibility analysis → Uses database specs, LLM does arithmetic  
+ Configuration generation → Validated against reference manual  
 
 ### Pure LLM (Interface Only)
-💬 Natural language explanations  
-💬 Question phrasing  
-💬 Reasoning text  
-💬 User intent parsing  
+ Natural language explanations  
+ Question phrasing  
+ Reasoning text  
+ User intent parsing  
 
 ---
 
-## 🎯 The Guarantee
+##  The Guarantee
 
 **We guarantee**:
 
@@ -400,36 +400,36 @@ Sensor: 2mA = 222mA. With 20% margin = 266mA. Recommend 1.5A."
 6. **Configurations are validated against datasheets**
 
 **We NEVER**:
-1. ❌ Let LLM invent part numbers
-2. ❌ Let LLM generate specifications
-3. ❌ Trust LLM for numerical values
-4. ❌ Recommend components not in database
-5. ❌ Use LLM output without validation
+1.  Let LLM invent part numbers
+2.  Let LLM generate specifications
+3.  Trust LLM for numerical values
+4.  Recommend components not in database
+5.  Use LLM output without validation
 
 ---
 
-## 🔍 How to Verify (For Users)
+##  How to Verify (For Users)
 
 **Every recommendation includes**:
-- 📄 Evidence links (click to see datasheet)
-- 📊 Confidence scores (how certain we are)
-- 🔗 Source attribution (where data came from)
-- ✅ Validation status (passed all checks)
+-  Evidence links (click to see datasheet)
+-  Confidence scores (how certain we are)
+-  Source attribution (where data came from)
+-  Validation status (passed all checks)
 
 **Example in UI**:
 ```
 Recommended: STM32F405RGT6 ($5.50)
 
 Specifications:
-  Flash: 1024 KB [📄 Evidence: ST Datasheet p.12]
-  CAN: 2 controllers [📄 Evidence: ST Datasheet p.15]
+  Flash: 1024 KB [ Evidence: ST Datasheet p.12]
+  CAN: 2 controllers [ Evidence: ST Datasheet p.15]
   
 Optimization Applied:
   PWM Timers: 3 → 1 (advanced timer)
   Reasoning: "BLDC FOC needs 1 advanced timer..."
-  Validated: ✅ YES (47 MCUs in database match)
+  Validated:  YES (47 MCUs in database match)
   
-Price: $5.50 [🔗 Digi-Key, updated 2 hours ago]
+Price: $5.50 [ Digi-Key, updated 2 hours ago]
 ```
 
 ---

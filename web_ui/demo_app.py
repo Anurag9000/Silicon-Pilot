@@ -241,7 +241,7 @@ def get_inline_html():
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 Silicon-Pilot</h1>
+            <h1> Silicon-Pilot</h1>
             <p>AI-Powered Hardware Design Assistant (Demo)</p>
         </div>
         

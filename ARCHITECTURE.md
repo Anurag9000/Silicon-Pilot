@@ -5,7 +5,7 @@ This document explains the end-to-end flow of the Silicon-Pilot system, detailin
 
 ---
 
-## 🏗️ 1. Block Diagram & System Flow
+##  1. Block Diagram & System Flow
 
 The system operates in two distinct phases: **Offline Ingestion** (Building the Brain) and **Online Serving** (Answering User Design Queries).
 
@@ -45,7 +45,7 @@ graph TD
 
 ---
 
-## 🔍 2. Detailed Step-by-Step Process
+##  2. Detailed Step-by-Step Process
 
 ### Step 1: Discovery (The "Census")
 **File:** `ingestion/stm32_mcu_ingester.py`
@@ -102,7 +102,7 @@ graph TD
 
 ---
 
-## 🛠️ 3. How to Run It (The Commands)
+##  3. How to Run It (The Commands)
 
 To populate the system with **REAL DATA** from scratch, run these commands:
 

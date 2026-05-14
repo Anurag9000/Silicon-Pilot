@@ -406,7 +406,7 @@ def get_inline_html():
 <body>
     <div class="container">
         <div class="header">
-            <h1>🚀 Silicon-Pilot</h1>
+            <h1> Silicon-Pilot</h1>
             <p>AI-Powered Hardware Design Assistant (Production)</p>
         </div>
         
@@ -532,10 +532,10 @@ if __name__ == "__main__":
     print("=" * 80)
     print()
     print("Features:")
-    print("  ✅ Database-connected")
-    print("  ✅ LLM-driven dynamic questioning")
-    print("  ✅ Cost optimization")
-    print("  ✅ All export formats")
+    print("   Database-connected")
+    print("   LLM-driven dynamic questioning")
+    print("   Cost optimization")
+    print("   All export formats")
     print()
     print("Access the UI at: http://localhost:8001")
     print()

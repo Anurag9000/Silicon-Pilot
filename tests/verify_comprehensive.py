@@ -34,17 +34,17 @@ class VerificationResult:
     def add_pass(self, test_name: str, details: str = ""):
         self.total_tests += 1
         self.passed_tests += 1
-        logger.info(f"✅ {test_name}: PASSED {details}")
+        logger.info(f" {test_name}: PASSED {details}")
         
     def add_fail(self, test_name: str, reason: str):
         self.total_tests += 1
         self.failed_tests += 1
         self.failures.append(f"{test_name}: {reason}")
-        logger.error(f"❌ {test_name}: FAILED - {reason}")
+        logger.error(f" {test_name}: FAILED - {reason}")
         
     def add_warning(self, test_name: str, reason: str):
         self.warnings += 1
-        logger.warning(f"⚠️  {test_name}: WARNING - {reason}")
+        logger.warning(f"  {test_name}: WARNING - {reason}")
         
     def print_summary(self):
         logger.info("\n" + "="*80)

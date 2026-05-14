@@ -115,7 +115,7 @@ THETA_JC_PATTERN = re.compile(
 
 # Features bullet: "2 × 12-bit ADC, 2 Msps"
 FEATURE_BULLET_PATTERN = re.compile(
-    r"[•\-–▪]\s*(.{5,120})",
+    r"[•\-–]\s*(.{5,120})",
     re.MULTILINE,
 )
 

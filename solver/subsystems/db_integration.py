@@ -260,7 +260,7 @@ async def migrate_subsystem_tables():
         await conn.execute(CREATE_DISPLAY_SPECS_TABLE)
         print("✓ Created display_specs table")
     
-    print("\n✅ All subsystem tables created successfully")
+    print("\n All subsystem tables created successfully")
 
 
 # ============================================================================

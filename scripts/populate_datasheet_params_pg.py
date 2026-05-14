@@ -91,7 +91,7 @@ async def run_exhaustive_parameter_ingestion():
             inserted += 1
 
     await conn.close()
-    logger.info(f"✅ Thorough PDF integration complete! Inserted {inserted} extracted parameters into the database.")
+    logger.info(f" Thorough PDF integration complete! Inserted {inserted} extracted parameters into the database.")
 
 if __name__ == "__main__":
     asyncio.run(run_exhaustive_parameter_ingestion())

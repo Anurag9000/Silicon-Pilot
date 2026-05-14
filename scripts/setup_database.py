@@ -37,7 +37,7 @@ def setup_database():
         port = int(host_port[1]) if len(host_port) > 1 else 5432
         dbname = host_port_db[1]
     except Exception as e:
-        print(f"❌ Error parsing connection string: {e}")
+        print(f" Error parsing connection string: {e}")
         return False
     
     # Step 1: Create Database if not exists
@@ -59,7 +59,7 @@ def setup_database():
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"❌ System DB Error: {e}")
+        print(f" System DB Error: {e}")
         return False
 
     # Step 2: Apply Schema
@@ -81,7 +81,7 @@ def setup_database():
             cursor.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto";')
             print("✓ Schema reset and extensions created")
         except Exception as e:
-            print(f"⚠ Schema/Extension warning: {e}")
+            print(f" Schema/Extension warning: {e}")
 
         # B. Apply SQL Files
         root = Path(__file__).parent.parent / "database"
@@ -112,7 +112,7 @@ def setup_database():
                     print("@@@@ END ERROR @@@@\n")
                     # Don't return, try next
             else:
-                print(f"⚠ Skipped {fname} (not found)")
+                print(f" Skipped {fname} (not found)")
                 
         cursor.close()
         conn.close()
@@ -120,7 +120,7 @@ def setup_database():
         return True
         
     except Exception as e:
-        print(f"❌ Application Error: {e}")
+        print(f" Application Error: {e}")
         return False
 
 if __name__ == "__main__":

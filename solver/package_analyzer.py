@@ -112,10 +112,10 @@ _PACKAGE_DB: Dict[str, dict] = {
             "Rework is difficult and requires specialist BGA rework station."
         ),
         "warnings": [
-            "⚠️ X-ray inspection mandatory — no joints visible post-reflow.",
-            "⚠️ Minimum 4-layer PCB required for signal fan-out.",
-            "⚠️ Rework requires specialist BGA rework station (~$5k–$30k equipment).",
-            "⚠️ PCB bare-board cost increases ~40–60% vs LQFP equivalent.",
+            " X-ray inspection mandatory — no joints visible post-reflow.",
+            " Minimum 4-layer PCB required for signal fan-out.",
+            " Rework requires specialist BGA rework station (~$5k–$30k equipment).",
+            " PCB bare-board cost increases ~40–60% vs LQFP equivalent.",
             "BGA assembly NRE (stencil, programming) adds to prototype cost.",
         ],
     },
@@ -136,9 +136,9 @@ _PACKAGE_DB: Dict[str, dict] = {
             "Requires 4-layer minimum with 0.1mm drill capability."
         ),
         "warnings": [
-            "⚠️ 0.5mm pitch — requires tight PCB design rules (≤0.1mm drill).",
-            "⚠️ X-ray inspection mandatory.",
-            "⚠️ 4-layer PCB minimum. Consider HDI for dense designs.",
+            " 0.5mm pitch — requires tight PCB design rules (≤0.1mm drill).",
+            " X-ray inspection mandatory.",
+            " 4-layer PCB minimum. Consider HDI for dense designs.",
         ],
     },
     "WLCSP": {
@@ -160,12 +160,12 @@ _PACKAGE_DB: Dict[str, dict] = {
             "Not recommended for prototyping or low-volume designs."
         ),
         "warnings": [
-            "⚠️ REQUIRES HDI PCB — blind/buried vias mandatory. Board cost +100–200% vs LQFP.",
-            "⚠️ X-ray + acoustic microscopy inspection required.",
-            "⚠️ No hand-soldering possible under any circumstances.",
-            "⚠️ Not recommended for prototyping. Consider UFQFPN variant for development.",
-            "⚠️ Moisture sensitivity level (MSL) handling required — bake before use.",
-            "⚠️ Minimum PCB trace/space: 75µm/75µm — specialized fabrication required.",
+            " REQUIRES HDI PCB — blind/buried vias mandatory. Board cost +100–200% vs LQFP.",
+            " X-ray + acoustic microscopy inspection required.",
+            " No hand-soldering possible under any circumstances.",
+            " Not recommended for prototyping. Consider UFQFPN variant for development.",
+            " Moisture sensitivity level (MSL) handling required — bake before use.",
+            " Minimum PCB trace/space: 75µm/75µm — specialized fabrication required.",
         ],
     },
     "UFBGA": {
@@ -185,9 +185,9 @@ _PACKAGE_DB: Dict[str, dict] = {
             "6-layer minimum PCB. Strictly volume-production only."
         ),
         "warnings": [
-            "⚠️ REQUIRES HDI PCB with sequential lamination (6+ layers).",
-            "⚠️ Board fabrication cost +200–350% vs standard LQFP design.",
-            "⚠️ Prototype assembly by specialized EMS only.",
+            " REQUIRES HDI PCB with sequential lamination (6+ layers).",
+            " Board fabrication cost +200–350% vs standard LQFP design.",
+            " Prototype assembly by specialized EMS only.",
         ],
     },
     "VQFN": {
@@ -401,7 +401,7 @@ def _build_design_recs(pkg_family: str, info: dict, part_data: dict) -> List[str
             )
         else:
             recs.append(
-                "✅ LQFP is the optimal choice for development and low-volume production. "
+                " LQFP is the optimal choice for development and low-volume production. "
                 "No special PCB requirements. Standard assembly services suffice."
             )
 

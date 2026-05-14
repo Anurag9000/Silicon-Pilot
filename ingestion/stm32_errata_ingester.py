@@ -33,21 +33,21 @@ DOC_MAP = {
     # STM32F4 Series
     "STM32F405": [
         {"type": "errata_sheet", "id": "es0182", "title": "STM32F405/415/407/417 xx Errata sheet"},
-        {"type": "reference_manual", "id": "rm0090", "title": "STM32F405/415, STM32F407/417, STM32F427/437 and STM32F429/439 advanced Arm®-based 32-bit MCUs"},
+        {"type": "reference_manual", "id": "rm0090", "title": "STM32F405/415, STM32F407/417, STM32F427/437 and STM32F429/439 advanced Arm-based 32-bit MCUs"},
     ],
     "STM32F407": [
         {"type": "errata_sheet", "id": "es0182", "title": "STM32F405/415/407/417 xx Errata sheet"},
-        {"type": "reference_manual", "id": "rm0090", "title": "STM32F405/415, STM32F407/417, STM32F427/437 and STM32F429/439 advanced Arm®-based 32-bit MCUs"},
+        {"type": "reference_manual", "id": "rm0090", "title": "STM32F405/415, STM32F407/417, STM32F427/437 and STM32F429/439 advanced Arm-based 32-bit MCUs"},
     ],
     # STM32F1 Series
     "STM32F103": [
          {"type": "errata_sheet", "id": "es0016", "title": "STM32F101x8/B, STM32F102x8/B and STM32F103x8/B medium-density device limitations"},
-         {"type": "reference_manual", "id": "rm0008", "title": "STM32F101xx, STM32F102xx, STM32F103xx, STM32F105xx and STM32F107xx advanced Arm®-based 32-bit MCUs"},
+         {"type": "reference_manual", "id": "rm0008", "title": "STM32F101xx, STM32F102xx, STM32F103xx, STM32F105xx and STM32F107xx advanced Arm-based 32-bit MCUs"},
     ],
     # STM32G0 Series
     "STM32G070": [
         {"type": "errata_sheet", "id": "es0418", "title": "STM32G070xB/x6 device limitations"},
-        {"type": "reference_manual", "id": "rm0444", "title": "STM32G0x0 advanced Arm®-based 32-bit MCUs"},
+        {"type": "reference_manual", "id": "rm0444", "title": "STM32G0x0 advanced Arm-based 32-bit MCUs"},
     ]
 }
 

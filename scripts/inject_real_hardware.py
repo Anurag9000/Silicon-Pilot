@@ -18,7 +18,7 @@ def force_inject_real_hardware():
         pg_conn.close()
         print("✓ Real hardware injected into BOTH SQLite and PostgreSQL.")
     except Exception as e:
-        print(f"⚠ Skipping PostgreSQL injection: {e}")
+        print(f" Skipping PostgreSQL injection: {e}")
 
 def inject_to_db(conn, db_type):
     cursor = conn.cursor()

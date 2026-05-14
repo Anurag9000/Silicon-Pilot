@@ -188,7 +188,7 @@ class EcosystemRAG:
                 chip_logic = float(chip_logic)
                 if chip_logic > mcu_logic_v + 0.3:
                     compat_warning = (
-                        f"⚠️ Logic level mismatch: {chip['mpn']} runs at {chip_logic}V, "
+                        f" Logic level mismatch: {chip['mpn']} runs at {chip_logic}V, "
                         f"{mcu_mpn} at {mcu_logic_v}V. Level-shifter required (e.g. TXS0108E)."
                     )
 

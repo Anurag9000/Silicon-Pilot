@@ -182,7 +182,7 @@ def example_motor_controller():
     print()
     
     print("=" * 60)
-    print("✅ Complete! Motor controller design ready.")
+    print(" Complete! Motor controller design ready.")
     print("=" * 60)
 
 
@@ -252,7 +252,7 @@ def example_sensor_node():
         print()
     
     print("=" * 60)
-    print("✅ Complete! Sensor node design ready.")
+    print(" Complete! Sensor node design ready.")
     print("=" * 60)
 
 
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     example_motor_controller()
     example_sensor_node()
     
-    print("\n\n🎉 Phase 2 Pipeline Demonstration Complete!")
+    print("\n\n Phase 2 Pipeline Demonstration Complete!")
     print("\nNext steps:")
     print("1. Expand template library (10+ templates)")
     print("2. Integrate with real MCU database")

@@ -39,7 +39,7 @@ async def run_complete_demo():
     # ========================================================================
     
     user_input = "I want to build a CAN motor controller for BLDC motors at 24V"
-    print(f"📝 User Input:")
+    print(f" User Input:")
     print(f"   \"{user_input}\"")
     print()
     
@@ -47,7 +47,7 @@ async def run_complete_demo():
     # Step 2: Intent Classification
     # ========================================================================
     
-    print("🔍 Step 1: Intent Classification")
+    print(" Step 1: Intent Classification")
     parser = IntentParser(use_llm=False)  # Use keyword fallback
     intent = parser.parse_intent(user_input)
     
@@ -60,7 +60,7 @@ async def run_complete_demo():
     # Step 3: Template Matching
     # ========================================================================
     
-    print("🎯 Step 2: Template Matching")
+    print(" Step 2: Template Matching")
     template_dir = Path(__file__).parent.parent / "templates"
     loader = TemplateLoader(str(template_dir))
     matcher = TemplateMatcher(loader)
@@ -68,7 +68,7 @@ async def run_complete_demo():
     matches = matcher.match_templates(intent)
     
     if not matches:
-        print("   ❌ No matching templates found")
+        print("    No matching templates found")
         return
     
     best_match = matches[0]
@@ -81,7 +81,7 @@ async def run_complete_demo():
     # Step 4: Load Template
     # ========================================================================
     
-    print("📋 Step 3: Loading Template")
+    print(" Step 3: Loading Template")
     template = loader.load_template(best_match.template_id)
     print(f"   Template: {template.name}")
     print(f"   Device Type: {template.device_type}")
@@ -93,7 +93,7 @@ async def run_complete_demo():
     # Step 5: Simulate User Answers
     # ========================================================================
     
-    print("💬 Step 4: User Answers (Simulated)")
+    print(" Step 4: User Answers (Simulated)")
     answers = {
         "motor_type": "BLDC",
         "supply_voltage": "24",
@@ -116,7 +116,7 @@ async def run_complete_demo():
     # Step 6: Build Architecture
     # ========================================================================
     
-    print("🏗️  Step 5: Building Architecture")
+    print("  Step 5: Building Architecture")
     builder = ArchitectureBuilder()
     architecture = builder.build_architecture(template, answers)
     
@@ -129,7 +129,7 @@ async def run_complete_demo():
     # Step 7: Compile Constraints
     # ========================================================================
     
-    print("⚙️  Step 6: Compiling Constraints")
+    print("  Step 6: Compiling Constraints")
     compiler = ConstraintCompiler()
     req_spec = compiler.compile_constraints(architecture)
     
@@ -144,7 +144,7 @@ async def run_complete_demo():
     # Step 8: Multi-Subsystem Solving
     # ========================================================================
     
-    print("🔧 Step 7: Multi-Subsystem Solving")
+    print(" Step 7: Multi-Subsystem Solving")
     
     # Simulate component recommendations (would use real solvers)
     components = [
@@ -210,7 +210,7 @@ async def run_complete_demo():
     # Step 9: Generate Configuration Notes
     # ========================================================================
     
-    print("📝 Step 8: Generating Configuration Notes")
+    print(" Step 8: Generating Configuration Notes")
     
     config = {
         "clock": {
@@ -256,7 +256,7 @@ async def run_complete_demo():
     # Step 10: Enhanced Exports
     # ========================================================================
     
-    print("📤 Step 9: Exporting to CAD Tools")
+    print(" Step 9: Exporting to CAD Tools")
     
     export_manager = ExportManager()
     project_name = "BLDC_MotorController_v1"
@@ -272,23 +272,23 @@ async def run_complete_demo():
     # ========================================================================
     
     print("=" * 80)
-    print("✅ Complete Pipeline Executed Successfully!")
+    print(" Complete Pipeline Executed Successfully!")
     print("=" * 80)
     print()
-    print("📊 Summary:")
+    print(" Summary:")
     print(f"   Template: {template.name}")
     print(f"   Components: {len(components)}")
     print(f"   Total Cost: ${total_cost:.2f}")
     print(f"   Exports: {len(['eagle', 'kicad', 'altium', 'cubemx', 'pdf'])} formats")
     print()
-    print("📁 Output Files:")
+    print(" Output Files:")
     print(f"   {output_dir}/{project_name}_eagle.xml")
     print(f"   {output_dir}/{project_name}_kicad.csv")
     print(f"   {output_dir}/{project_name}_altium.csv")
     print(f"   {output_dir}/{project_name}.ioc (STM32CubeMX)")
     print(f"   {output_dir}/{project_name}_report.pdf")
     print()
-    print("🚀 Ready for PCB design and firmware development!")
+    print(" Ready for PCB design and firmware development!")
     print()
 
 

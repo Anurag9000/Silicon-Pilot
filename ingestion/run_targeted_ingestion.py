@@ -57,7 +57,7 @@ async def run_ingestion(part_mpn: str = None, pdf_path: str = None):
             # Run Extraction
             extractor = STM32DatasheetExtractor(final_pdf_path)
             await extractor.save_to_db(conn, part_id)
-            print(f"  ✅ Extraction complete for {mpn}")
+            print(f"   Extraction complete for {mpn}")
             
     finally:
         await conn.close()
