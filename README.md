@@ -71,3 +71,16 @@ python server.py
 Watch Silicon-Pilot autonomously analyze requirements, compare hardware, solve pin muxing, evaluate power/package constraints, and build a full ecosystem BOM:
 
 ![Silicon-Pilot Live Demo](docs/silicon_pilot_live_demo.webp)
+
+
+## 🤖 Changing the LLM Model
+Silicon-Pilot uses Ollama by default for fully local, private AI inference. If you want to change the underlying model (e.g., from `qwen2.5:1.5b` to `llama3.2` or switch to OpenAI):
+
+1. Open the file: `core/llm_config.py`
+2. At the very top, locate the configuration variables:
+   ```python
+   LLM_PROVIDER = "ollama"       # Options: "ollama", "openai", "gemini", "anthropic"
+   LLM_MODEL = "qwen2.5:1.5b"    # The default model name
+   ```
+3. **To use a different local model**, run `ollama pull <model_name>` in your terminal, then update the `LLM_MODEL` variable.
+4. **To use a cloud provider**, change `LLM_PROVIDER = "openai"`, set `LLM_MODEL = "gpt-4o"`, and ensure your `.env` file has the `OPENAI_API_KEY`.

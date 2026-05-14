@@ -92,3 +92,10 @@ The system currently supports ingestion, search, and validation for the followin
 ## 6. Verification & Quality
 *   **Stress Testing**: `scripts/stress_test.py` validates <5ms API latency.
 *   **Integration Testing**: `tests/test_integration.py` validates end-to-end flows for all solvers.
+
+
+## 7. Advanced Engineering Solvers
+*   **Drop-In Replacement Engine**: Ranks pin-to-pin and software-compatible alternatives for EOL parts based on rework level (Drop-In, Minor, Moderate, Major).
+*   **Advanced Power Profiler**: Computes average system power and Peukert-corrected battery life based on specific duty cycles (Run, Sleep, Stop) and active peripherals.
+*   **PCB Package Analyzer**: Evaluates mechanical complexity, estimates cost multipliers, predicts required PCB layers, and flags HDI (High Density Interconnect) requirements for MCUs.
+*   **Component Ecosystem RAG**: Recommends complete chipsets (CAN transceivers, motor drivers, IMUs, LDOs) matched to MCU logic levels and interfaces.
