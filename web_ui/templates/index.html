@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Silicon-Pilot - Engineering Grade</title>
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --primary: #2563eb;
@@ -13,6 +15,12 @@
             --bg: #f8fafc;
             --card-bg: #ffffff;
         }
+
+        .markdown-body h3 { margin-top: 1rem; margin-bottom: 0.5rem; color: #1e293b; font-size: 1.1rem; }
+        .markdown-body h4 { margin-top: 0.75rem; margin-bottom: 0.5rem; color: #334155; font-size: 1rem; }
+        .markdown-body ul, .markdown-body ol { margin-left: 1.5rem; margin-bottom: 1rem; }
+        .markdown-body p { margin-bottom: 0.75rem; }
+        .markdown-body strong { font-weight: 600; color: #0f172a; }
 
         body {
             font-family: 'Segoe UI', system-ui, sans-serif;
@@ -629,8 +637,10 @@
                     <h2 style="margin-top:0;">Rigorous Architectural Debate</h2>
                     ${turns.map(t => `
                         <div style="margin-bottom:1.5rem; border-left:4px solid ${t.architect === 'Architect A' ? '#3b82f6' : '#ef4444'}; padding-left:1rem;">
-                            <strong style="color:var(--primary);">${t.architect}</strong>
-                            <p style="margin-top:0.25rem; font-size:0.95rem; line-height:1.5;">${t.argument}</p>
+                            <strong style="color:var(--primary); font-size: 1.1rem;">${t.architect}</strong>
+                            <div style="margin-top:0.5rem; font-size:0.95rem; line-height:1.6; color:#334155;" class="markdown-body">
+                                ${typeof marked !== 'undefined' ? marked.parse(t.argument) : t.argument}
+                            </div>
                         </div>
                     `).join('')}
                 </div>
